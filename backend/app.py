@@ -90,12 +90,11 @@ def generate_stl():
         logger.info(f"SCAD file: {scad_path}")
         logger.info(f"STL file: {stl_path}")
         
-        # 執行 OpenSCAD (使用 xvfb 虛擬顯示 + fast-csg 加速)
+        # 執行 OpenSCAD (使用 xvfb 虛擬顯示)
         cmd = [
             'openscad',
             '-o', stl_path,
             '--export-format', 'binstl',
-            '--enable=fast-csg',  # 啟用快速 CSG 運算
             scad_path
         ]
         
