@@ -72,16 +72,19 @@ module pendant() {{
 
 // === 主組件 ===
 
-// 1. 雙字母交集 (核心邏輯!)
-intersection() {{
-    letter1_shape();
-    letter2_shape();
-}}
+// 整個模型旋轉 90 度,讓 Z 軸成為高度軸
+rotate([90, 0, 0]) {{
+    // 1. 雙字母交集 (核心邏輯!)
+    intersection() {{
+        letter1_shape();
+        letter2_shape();
+    }}
 
-// 2. 墜頭 (放在頂部,支援旋轉)
-translate([pendant_x, pendant_y, target_height / 2 + pendant_outer_d / 2 + pendant_z])
-    rotate([0, pendant_rotation_y, 0])
-        pendant();
+    // 2. 墜頭 (放在頂部,支援旋轉)
+    translate([pendant_x, pendant_y, target_height / 2 + pendant_outer_d / 2 + pendant_z])
+        rotate([0, pendant_rotation_y, 0])
+            pendant();
+}}
 '''
     
     return scad_script
