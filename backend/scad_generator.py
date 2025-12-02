@@ -11,14 +11,20 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     - pendant_rotation_y: 墜頭 Y 軸旋轉角度
     """
     
-    # 深度適中 - 是高度的 3 倍 (平衡品質與速度)
-    depth = size * 3.0
+    # 動態深度 - 根據尺寸調整
+    depth = size * 2.0
+    
+    # 動態精度 - 小尺寸可以用稍高精度
+    if size <= 20:
+        fn = 20  # 小吊飾 - 稍高精度
+    else:
+        fn = 16  # 大吊飾 - 低精度
     
     scad_script = f'''
 // DUET 雙字母吊飾生成器 (90度相交版本)
 // 使用 CSG intersection 確保無破面 (manifold)
 
-$fn = 32; // 降低解析度以加速運算
+$fn = {fn}; // 動態解析度 (根據尺寸優化)
 
 // === 參數設定 ===
 letter1 = "{letter1}";
@@ -26,7 +32,7 @@ letter2 = "{letter2}";
 font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};      // 目標高度
-depth = {depth};             // 深度 (高度的 3 倍)
+depth = {depth};             // 深度 (高度的 2 倍)
 
 // 墜頭參數
 pendant_x = {pendant_x};
@@ -62,12 +68,12 @@ module letter2_shape() {{
                  valign = "center");
 }}
 
-// 墜頭模組 (Torus 環)
+// 墜頭模組 (簡化版 - 直接用 torus)
 module pendant() {{
     rotate([0, 90, 0])  // 讓環口朝前
-        rotate_extrude(convexity = 10)
+        rotate_extrude($fn = 12)  // 墜頭用更低解析度
             translate([pendant_outer_d / 2, 0, 0])
-                circle(d = pendant_tube_d);
+                circle(d = pendant_tube_d, $fn = 8);  // 圓管也降低
 }}
 
 // === 主組件 ===
