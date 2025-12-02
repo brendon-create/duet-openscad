@@ -11,8 +11,8 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     - pendant_rotation_y: 墜頭 Y 軸旋轉角度
     """
     
-    # 厚度為高度的 1/3 (根據之前的經驗)
-    thickness = size / 3
+    # 厚度要非常大 - 是高度的 5 倍!這樣兩個字母相交才會有足夠的重疊
+    depth = size * 5.0
     
     scad_script = f'''
 // DUET 雙字母吊飾生成器 (90度相交版本)
@@ -26,7 +26,7 @@ letter2 = "{letter2}";
 font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};      // 目標高度
-thickness = {thickness};     // 厚度
+depth = {depth};             // 超大深度 (高度的 5 倍)
 
 // 墜頭參數
 pendant_x = {pendant_x};
@@ -40,10 +40,10 @@ pendant_tube_d = target_height * 0.03 * 2;   // 管徑
 
 // === 模組定義 ===
 
-// 字母 1 模組 (正面, 平行於 YZ 平面)
+// 字母 1 模組 (正面, 超厚 extrude)
 module letter1_shape() {{
-    // 使用 linear_extrude 生成立體字
-    linear_extrude(height = thickness, center = true)
+    // 使用超大深度的 linear_extrude
+    linear_extrude(height = depth, center = true)
         text(letter1, 
              size = target_height, 
              font = font1, 
@@ -51,10 +51,10 @@ module letter1_shape() {{
              valign = "center");
 }}
 
-// 字母 2 模組 (側面, 平行於 XZ 平面, 需旋轉 90度)
+// 字母 2 模組 (側面, 超厚 extrude + 旋轉 90度)
 module letter2_shape() {{
     rotate([0, 90, 0])  // 繞 Y 軸旋轉 90度
-        linear_extrude(height = thickness, center = true)
+        linear_extrude(height = depth, center = true)
             text(letter2, 
                  size = target_height, 
                  font = font2, 
@@ -65,12 +65,9 @@ module letter2_shape() {{
 // 墜頭模組 (Torus 環)
 module pendant() {{
     rotate([0, 90, 0])  // 讓環口朝前
-        difference() {{
-            // 外環
-            rotate_extrude(convexity = 10)
-                translate([pendant_outer_d / 2, 0, 0])
-                    circle(d = pendant_tube_d);
-        }}
+        rotate_extrude(convexity = 10)
+            translate([pendant_outer_d / 2, 0, 0])
+                circle(d = pendant_tube_d);
 }}
 
 // === 主組件 ===
