@@ -11,14 +11,14 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     - pendant_rotation_y: 墜頭 Y 軸旋轉角度
     """
     
-    # 厚度要非常大 - 是高度的 5 倍!這樣兩個字母相交才會有足夠的重疊
-    depth = size * 5.0
+    # 深度適中 - 是高度的 3 倍 (平衡品質與速度)
+    depth = size * 3.0
     
     scad_script = f'''
 // DUET 雙字母吊飾生成器 (90度相交版本)
 // 使用 CSG intersection 確保無破面 (manifold)
 
-$fn = 64; // 高解析度
+$fn = 32; // 降低解析度以加速運算
 
 // === 參數設定 ===
 letter1 = "{letter1}";
@@ -26,7 +26,7 @@ letter2 = "{letter2}";
 font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};      // 目標高度
-depth = {depth};             // 超大深度 (高度的 5 倍)
+depth = {depth};             // 深度 (高度的 3 倍)
 
 // 墜頭參數
 pendant_x = {pendant_x};

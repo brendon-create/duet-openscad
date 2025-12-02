@@ -108,7 +108,7 @@ def generate_stl():
             cmd,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=120,  # 增加到 120 秒
             env=env
         )
         
