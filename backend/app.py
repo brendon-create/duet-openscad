@@ -21,18 +21,29 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 def health_check():
     """健康檢查端點"""
     try:
-        # 檢查 OpenSCAD 是否可用
-        result = subprocess.run(['openscad', '--version'], 
+        # 檢查 OpenSCAD 是否可用 (使用 which 指令)
+        result = subprocess.run(['which', 'openscad'], 
                               capture_output=True, 
                               text=True, 
                               timeout=5)
-        openscad_version = result.stdout.strip() if result.returncode == 0 else "Not found"
+        if result.returncode == 0:
+            openscad_path = result.stdout.strip()
+            # 嘗試取得版本
+            version_result = subprocess.run(['openscad', '--version'], 
+                                          capture_output=True, 
+                                          text=True, 
+                                          timeout=5,
+                                          env={'DISPLAY': ':99'})  # 使用 xvfb
+            version_info = version_result.stdout.strip() or version_result.stderr.strip() or "Installed"
+            openscad_status = f"{openscad_path} - {version_info}"
+        else:
+            openscad_status = "Not found"
     except Exception as e:
-        openscad_version = f"Error: {str(e)}"
+        openscad_status = f"Error: {str(e)}"
     
     return jsonify({
         'status': 'healthy',
-        'openscad': openscad_version,
+        'openscad': openscad_status,
         'temp_dir': TEMP_DIR
     })
 
@@ -77,7 +88,7 @@ def generate_stl():
         logger.info(f"SCAD file: {scad_path}")
         logger.info(f"STL file: {stl_path}")
         
-        # 執行 OpenSCAD
+        # 執行 OpenSCAD (使用 xvfb 虛擬顯示)
         cmd = [
             'openscad',
             '-o', stl_path,
@@ -87,11 +98,16 @@ def generate_stl():
         
         logger.info(f"Running command: {' '.join(cmd)}")
         
+        # 設定環境變數使用 xvfb
+        env = os.environ.copy()
+        env['DISPLAY'] = ':99'
+        
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
+            env=env
         )
         
         if result.returncode != 0:

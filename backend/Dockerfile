@@ -27,5 +27,6 @@ COPY . .
 # 暴露端口
 EXPOSE 5000
 
-# 使用 gunicorn 啟動
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "app:app"]
+# 啟動 xvfb 並使用 gunicorn
+CMD Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 & \
+    gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 60 app:app
