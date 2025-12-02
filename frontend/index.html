@@ -179,13 +179,13 @@
         
         <form id="generateForm">
             <div class="form-group">
-                <label>📝 文字內容</label>
-                <input type="text" id="text" value="DUET" required>
+                <label>📝 第一個字母 (正面)</label>
+                <input type="text" id="letter1" value="D" maxlength="1" required style="text-align: center; font-size: 24px; text-transform: uppercase;">
             </div>
             
             <div class="form-group">
-                <label>🔤 字體</label>
-                <select id="font">
+                <label>🔤 字體 1</label>
+                <select id="font1">
                     <option value="Liberation Sans:style=Bold">Liberation Sans Bold</option>
                     <option value="Liberation Serif:style=Bold">Liberation Serif Bold</option>
                     <option value="Liberation Mono:style=Bold">Liberation Mono Bold</option>
@@ -193,45 +193,59 @@
             </div>
             
             <div class="form-group">
-                <label>📏 字體大小 (mm)</label>
-                <input type="number" id="size" value="10" min="5" max="50" required>
+                <label>📝 第二個字母 (側面, 90°)</label>
+                <input type="text" id="letter2" value="T" maxlength="1" required style="text-align: center; font-size: 24px; text-transform: uppercase;">
             </div>
             
             <div class="form-group">
-                <label>📐 厚度 (mm)</label>
-                <input type="number" id="height" value="2" min="1" max="10" step="0.5" required>
+                <label>🔤 字體 2</label>
+                <select id="font2">
+                    <option value="Liberation Sans:style=Bold">Liberation Sans Bold</option>
+                    <option value="Liberation Serif:style=Bold">Liberation Serif Bold</option>
+                    <option value="Liberation Mono:style=Bold">Liberation Mono Bold</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>📏 尺寸 (高度 mm)</label>
+                <select id="size">
+                    <option value="15">15 mm (Petite)</option>
+                    <option value="20" selected>20 mm (Standard)</option>
+                    <option value="25">25 mm (Grand)</option>
+                    <option value="30">30 mm (Statement)</option>
+                </select>
             </div>
             
             <div class="pendant-controls">
-                <h3>🔗 墜頭控制 (4 軸)</h3>
+                <h3>🔗 墜頭位置微調</h3>
                 
                 <div class="slider-group">
                     <div class="slider-label">
-                        <span>X 軸</span>
+                        <span>X 軸 (左右)</span>
                         <span id="xValue">0</span>
                     </div>
-                    <input type="range" id="pendantX" min="-20" max="20" value="0" step="0.5">
+                    <input type="range" id="pendantX" min="-15" max="15" value="0" step="0.5">
                 </div>
                 
                 <div class="slider-group">
                     <div class="slider-label">
-                        <span>Y 軸</span>
+                        <span>Y 軸 (上下)</span>
                         <span id="yValue">0</span>
                     </div>
-                    <input type="range" id="pendantY" min="-20" max="20" value="0" step="0.5">
+                    <input type="range" id="pendantY" min="-10" max="10" value="0" step="0.5">
                 </div>
                 
                 <div class="slider-group">
                     <div class="slider-label">
-                        <span>Z 軸</span>
+                        <span>Z 軸 (前後)</span>
                         <span id="zValue">0</span>
                     </div>
-                    <input type="range" id="pendantZ" min="-20" max="20" value="0" step="0.5">
+                    <input type="range" id="pendantZ" min="-15" max="15" value="0" step="0.5">
                 </div>
                 
                 <div class="slider-group">
                     <div class="slider-label">
-                        <span>旋轉 Y</span>
+                        <span>旋轉 Y 軸</span>
                         <span id="rotationValue">0°</span>
                     </div>
                     <input type="range" id="pendantRotation" min="-180" max="180" value="0" step="5">
@@ -239,7 +253,7 @@
             </div>
             
             <button type="submit" id="generateBtn">
-                🚀 生成 STL 檔案
+                🚀 生成 DUET STL 檔案
             </button>
         </form>
         
@@ -276,10 +290,11 @@
             showStatus('正在生成 STL 檔案...', 'loading');
             
             const data = {
-                text: document.getElementById('text').value,
-                font: document.getElementById('font').value,
+                letter1: document.getElementById('letter1').value.toUpperCase(),
+                letter2: document.getElementById('letter2').value.toUpperCase(),
+                font1: document.getElementById('font1').value,
+                font2: document.getElementById('font2').value,
                 size: parseFloat(document.getElementById('size').value),
-                height: parseFloat(document.getElementById('height').value),
                 pendant: {
                     x: parseFloat(document.getElementById('pendantX').value),
                     y: parseFloat(document.getElementById('pendantY').value),
@@ -305,7 +320,7 @@
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${data.text}.stl`;
+                a.download = `${data.letter1}${data.letter2}_DUET.stl`;
                 a.click();
                 
                 showStatus('✅ STL 檔案生成成功!', 'success');

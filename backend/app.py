@@ -55,10 +55,11 @@ def generate_stl():
         logger.info(f"Received request: {data}")
         
         # 提取參數
-        text = data.get('text', 'DUET')
-        font = data.get('font', 'Liberation Sans:style=Bold')
-        size = data.get('size', 10)
-        height = data.get('height', 2)
+        letter1 = data.get('letter1', 'D')
+        letter2 = data.get('letter2', 'T')
+        font1 = data.get('font1', 'Liberation Sans:style=Bold')
+        font2 = data.get('font2', 'Liberation Sans:style=Bold')
+        size = data.get('size', 20)
         pendant_config = data.get('pendant', {
             'x': 0,
             'y': 0,
@@ -68,10 +69,11 @@ def generate_stl():
         
         # 生成 OpenSCAD 腳本
         scad_content = generate_scad_script(
-            text=text,
-            font=font,
+            letter1=letter1,
+            letter2=letter2,
+            font1=font1,
+            font2=font2,
             size=size,
-            height=height,
             pendant_x=pendant_config.get('x', 0),
             pendant_y=pendant_config.get('y', 0),
             pendant_z=pendant_config.get('z', 0),
@@ -131,7 +133,7 @@ def generate_stl():
             stl_path,
             mimetype='application/octet-stream',
             as_attachment=True,
-            download_name=f'{text}.stl'
+            download_name=f'{letter1}{letter2}_DUET.stl'
         )
         
         # 清理臨時檔案 (在 response 後)

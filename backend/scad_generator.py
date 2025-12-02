@@ -1,27 +1,32 @@
-def generate_scad_script(text, font, size, height, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
+def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
     """
-    生成 OpenSCAD 腳本
+    生成 DUET 雙字母 90度相交的 OpenSCAD 腳本
     
     參數:
-    - text: 文字內容
-    - font: 字體名稱
-    - size: 字體大小
-    - height: 厚度
-    - pendant_x, pendant_y, pendant_z: 墜頭位置
+    - letter1: 第一個字母 (正面)
+    - letter2: 第二個字母 (側面, 旋轉90度)
+    - font1, font2: 字體名稱
+    - size: 目標高度 (mm)
+    - pendant_x, pendant_y, pendant_z: 墜頭位置微調
     - pendant_rotation_y: 墜頭 Y 軸旋轉角度
     """
     
+    # 厚度為高度的 1/3 (根據之前的經驗)
+    thickness = size / 3
+    
     scad_script = f'''
-// DUET 文字吊飾生成器
-// 使用 CSG 確保無破面 (manifold)
+// DUET 雙字母吊飾生成器 (90度相交版本)
+// 使用 CSG intersection 確保無破面 (manifold)
 
-$fn = 50; // 圓滑度
+$fn = 64; // 高解析度
 
 // === 參數設定 ===
-text_content = "{text}";
-font_name = "{font}";
-text_size = {size};
-text_height = {height};
+letter1 = "{letter1}";
+letter2 = "{letter2}";
+font1 = "{font1}";
+font2 = "{font2}";
+target_height = {size};      // 目標高度
+thickness = {thickness};     // 厚度
 
 // 墜頭參數
 pendant_x = {pendant_x};
@@ -29,51 +34,58 @@ pendant_y = {pendant_y};
 pendant_z = {pendant_z};
 pendant_rotation_y = {pendant_rotation_y};
 
-// 墜頭尺寸
-pendant_outer_diameter = 3;
-pendant_inner_diameter = 2;
-pendant_thickness = 1;
+// 墜頭尺寸 (相對於 size)
+pendant_outer_d = target_height * 0.15 * 2;  // 外徑
+pendant_tube_d = target_height * 0.03 * 2;   // 管徑
 
 // === 模組定義 ===
 
-// 文字模組
-module text_base() {{
-    linear_extrude(height = text_height)
-        text(text_content, 
-             size = text_size, 
-             font = font_name, 
+// 字母 1 模組 (正面, 平行於 YZ 平面)
+module letter1_shape() {{
+    // 使用 linear_extrude 生成立體字
+    linear_extrude(height = thickness, center = true)
+        text(letter1, 
+             size = target_height, 
+             font = font1, 
              halign = "center", 
              valign = "center");
 }}
 
-// 墜頭模組 (CSG 確保無破面)
+// 字母 2 模組 (側面, 平行於 XZ 平面, 需旋轉 90度)
+module letter2_shape() {{
+    rotate([0, 90, 0])  // 繞 Y 軸旋轉 90度
+        linear_extrude(height = thickness, center = true)
+            text(letter2, 
+                 size = target_height, 
+                 font = font2, 
+                 halign = "center", 
+                 valign = "center");
+}}
+
+// 墜頭模組 (Torus 環)
 module pendant() {{
-    difference() {{
-        // 外圓柱
-        cylinder(h = pendant_thickness, 
-                 d = pendant_outer_diameter, 
-                 center = false);
-        
-        // 內孔 (稍微偏移避免 Z-fighting)
-        translate([0, 0, -0.01])
-            cylinder(h = pendant_thickness + 0.02, 
-                     d = pendant_inner_diameter, 
-                     center = false);
-    }}
+    rotate([0, 90, 0])  // 讓環口朝前
+        difference() {{
+            // 外環
+            rotate_extrude(convexity = 10)
+                translate([pendant_outer_d / 2, 0, 0])
+                    circle(d = pendant_tube_d);
+        }}
 }}
 
 // === 主組件 ===
-union() {{
-    // 文字主體 (直立)
-    rotate([90, 0, 0])
-        translate([0, 0, -text_height/2])
-            text_base();
-    
-    // 墜頭 (4 軸控制)
-    translate([pendant_x, pendant_y, pendant_z])
-        rotate([0, pendant_rotation_y, 0])
-            pendant();
+
+// 1. 雙字母交集 (核心邏輯!)
+intersection() {{
+    letter1_shape();
+    letter2_shape();
 }}
+
+// 2. 墜頭 (放在頂部,支援旋轉)
+translate([pendant_x, pendant_y, target_height / 2 + pendant_outer_d / 2 + pendant_z])
+    rotate([0, pendant_rotation_y, 0])
+        pendant();
 '''
     
     return scad_script
+
