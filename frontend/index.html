@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DUET - 文字吊飾生成器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .pendant-controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .pendant-controls h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .slider-group {
+            margin-bottom: 15px;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 20px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .backend-url {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e7f3ff;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .backend-url label {
+            color: #0066cc;
+            font-weight: 600;
+        }
+        
+        .backend-url input {
+            margin-top: 8px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 DUET</h1>
+        <p class="subtitle">文字吊飾生成器</p>
+        
+        <div class="backend-url">
+            <label>🔗 後端 API 網址</label>
+            <input type="text" id="backendUrl" placeholder="https://your-app.onrender.com">
+            <small style="color: #666; display: block; margin-top: 5px;">
+                部署後請填入您的 Render 後端網址
+            </small>
+        </div>
+        
+        <form id="generateForm">
+            <div class="form-group">
+                <label>📝 文字內容</label>
+                <input type="text" id="text" value="DUET" required>
+            </div>
+            
+            <div class="form-group">
+                <label>🔤 字體</label>
+                <select id="font">
+                    <option value="Liberation Sans:style=Bold">Liberation Sans Bold</option>
+                    <option value="Liberation Serif:style=Bold">Liberation Serif Bold</option>
+                    <option value="Liberation Mono:style=Bold">Liberation Mono Bold</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>📏 字體大小 (mm)</label>
+                <input type="number" id="size" value="10" min="5" max="50" required>
+            </div>
+            
+            <div class="form-group">
+                <label>📐 厚度 (mm)</label>
+                <input type="number" id="height" value="2" min="1" max="10" step="0.5" required>
+            </div>
+            
+            <div class="pendant-controls">
+                <h3>🔗 墜頭控制 (4 軸)</h3>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>X 軸</span>
+                        <span id="xValue">0</span>
+                    </div>
+                    <input type="range" id="pendantX" min="-20" max="20" value="0" step="0.5">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Y 軸</span>
+                        <span id="yValue">0</span>
+                    </div>
+                    <input type="range" id="pendantY" min="-20" max="20" value="0" step="0.5">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Z 軸</span>
+                        <span id="zValue">0</span>
+                    </div>
+                    <input type="range" id="pendantZ" min="-20" max="20" value="0" step="0.5">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>旋轉 Y</span>
+                        <span id="rotationValue">0°</span>
+                    </div>
+                    <input type="range" id="pendantRotation" min="-180" max="180" value="0" step="5">
+                </div>
+            </div>
+            
+            <button type="submit" id="generateBtn">
+                🚀 生成 STL 檔案
+            </button>
+        </form>
+        
+        <div id="status" style="display: none;"></div>
+    </div>
+    
+    <script>
+        // 更新滑桿顯示值
+        document.getElementById('pendantX').addEventListener('input', (e) => {
+            document.getElementById('xValue').textContent = e.target.value;
+        });
+        document.getElementById('pendantY').addEventListener('input', (e) => {
+            document.getElementById('yValue').textContent = e.target.value;
+        });
+        document.getElementById('pendantZ').addEventListener('input', (e) => {
+            document.getElementById('zValue').textContent = e.target.value;
+        });
+        document.getElementById('pendantRotation').addEventListener('input', (e) => {
+            document.getElementById('rotationValue').textContent = e.target.value + '°';
+        });
+        
+        // 表單提交
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const backendUrl = document.getElementById('backendUrl').value.trim();
+            if (!backendUrl) {
+                showStatus('請先填入後端 API 網址!', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            showStatus('正在生成 STL 檔案...', 'loading');
+            
+            const data = {
+                text: document.getElementById('text').value,
+                font: document.getElementById('font').value,
+                size: parseFloat(document.getElementById('size').value),
+                height: parseFloat(document.getElementById('height').value),
+                pendant: {
+                    x: parseFloat(document.getElementById('pendantX').value),
+                    y: parseFloat(document.getElementById('pendantY').value),
+                    z: parseFloat(document.getElementById('pendantZ').value),
+                    rotation_y: parseFloat(document.getElementById('pendantRotation').value)
+                }
+            };
+            
+            try {
+                const response = await fetch(`${backendUrl}/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${data.text}.stl`;
+                a.click();
+                
+                showStatus('✅ STL 檔案生成成功!', 'success');
+            } catch (error) {
+                showStatus(`❌ 錯誤: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+        
+        // Keep-Alive Ping (每 10 分鐘)
+        setInterval(async () => {
+            const backendUrl = document.getElementById('backendUrl').value.trim();
+            if (backendUrl) {
+                try {
+                    await fetch(`${backendUrl}/health`);
+                    console.log('Keep-alive ping sent');
+                } catch (error) {
+                    console.error('Keep-alive ping failed:', error);
+                }
+            }
+        }, 10 * 60 * 1000); // 10 分鐘
+    </script>
+</body>
+</html>
