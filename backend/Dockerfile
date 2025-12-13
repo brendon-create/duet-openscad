@@ -10,26 +10,17 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     openscad \
     xvfb \
-    wget \
-    unzip \
+    git \
     fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
-# 安裝 Google Fonts
+# 安裝 Google Fonts - 下載完整的 Google Fonts repository
 RUN mkdir -p /usr/share/fonts/truetype/google-fonts && \
-    cd /tmp && \
-    # 下載常用 Google Fonts (可以根據需求增減)
-    wget -q https://github.com/google/fonts/raw/main/ofl/roboto/Roboto-Regular.ttf -O /usr/share/fonts/truetype/google-fonts/Roboto-Regular.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/roboto/Roboto-Bold.ttf -O /usr/share/fonts/truetype/google-fonts/Roboto-Bold.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/opensans/OpenSans-Regular.ttf -O /usr/share/fonts/truetype/google-fonts/OpenSans-Regular.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/opensans/OpenSans-Bold.ttf -O /usr/share/fonts/truetype/google-fonts/OpenSans-Bold.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Regular.ttf -O /usr/share/fonts/truetype/google-fonts/PlayfairDisplay-Regular.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/playfairdisplay/PlayfairDisplay-Bold.ttf -O /usr/share/fonts/truetype/google-fonts/PlayfairDisplay-Bold.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Regular.ttf -O /usr/share/fonts/truetype/google-fonts/Montserrat-Regular.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/montserrat/Montserrat-Bold.ttf -O /usr/share/fonts/truetype/google-fonts/Montserrat-Bold.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/lato/Lato-Regular.ttf -O /usr/share/fonts/truetype/google-fonts/Lato-Regular.ttf && \
-    wget -q https://github.com/google/fonts/raw/main/ofl/lato/Lato-Bold.ttf -O /usr/share/fonts/truetype/google-fonts/Lato-Bold.ttf && \
-    # 更新字體快取
+    git clone --filter=blob:none --sparse https://github.com/google/fonts.git /tmp/google-fonts && \
+    cd /tmp/google-fonts && \
+    git sparse-checkout set ofl && \
+    find ofl -name "*.ttf" -exec cp {} /usr/share/fonts/truetype/google-fonts/ \; && \
+    rm -rf /tmp/google-fonts && \
     fc-cache -f -v
 
 # 設定工作目錄
