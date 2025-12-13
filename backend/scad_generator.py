@@ -50,9 +50,9 @@ pendant_tube_d = target_height * 0.03 * 2;   // 管徑
 
 // === 模組定義 ===
 
-// 字母 1 模組 (正面, 在 XZ 平面, 超厚 extrude 沿 Y 軸)
+// 字母 1 模組 (正面, 朝向觀眾, extrude 沿 Y 軸方向)
 module letter1_shape() {{
-    rotate([90, 0, 0])  // 將文字從 XY 平面轉到 XZ 平面
+    rotate([90, 0, 0])  // 將文字從 XY 平面轉到 XZ 平面（正面）
         linear_extrude(height = depth, center = true)
             text(letter1, 
                  size = target_height, 
@@ -61,10 +61,10 @@ module letter1_shape() {{
                  valign = "center");
 }}
 
-// 字母 2 模組 (側面, 在 YZ 平面, 超厚 extrude 沿 X 軸)
+// 字母 2 模組 (側面, 垂直於字母1, extrude 沿 X 軸方向)
 module letter2_shape() {{
-    rotate([90, 0, 0])  // 先將文字轉到 XZ 平面
-        rotate([0, 0, 90])  // 再繞 Z 軸旋轉 90 度到 YZ 平面
+    rotate([0, 90, 0])  // 將文字旋轉到 YZ 平面（側面）
+        rotate([90, 0, 0])  // 調整文字方向
             linear_extrude(height = depth, center = true)
                 text(letter2, 
                      size = target_height, 
