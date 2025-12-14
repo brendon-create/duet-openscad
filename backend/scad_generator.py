@@ -53,9 +53,10 @@ module letter1_shape() {{
 }}
 
 module letter2_shape() {{
-    rotate([90, 0, 90])
-        linear_extrude(height=depth, center=true)
-            letter_geometry(letter2, font2, target_height);
+    rotate([0, 0, 90])  // 第二步：繞 Z 軸轉 90 度
+        rotate([90, 0, 0])  // 第一步：繞 X 軸轉 90 度
+            linear_extrude(height=depth, center=true)
+                letter_geometry(letter2, font2, target_height);
 }}
 
 module bail() {{
