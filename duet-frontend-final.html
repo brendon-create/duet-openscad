@@ -1078,6 +1078,10 @@
             const evaluator = new Evaluator();
             const baseMat = new THREE.MeshStandardMaterial();
             
+            // === 定義全域軸向量（用於旋轉）===
+            const xAxis = new THREE.Vector3(1, 0, 0);
+            const zAxis = new THREE.Vector3(0, 0, 1);
+            
             const depth = targetHeight * 5.0;
             const params = {
                 font: null,
@@ -1101,7 +1105,6 @@
             
             // === 使用全域軸旋轉（更清晰、易維護）===
             // Letter 1: XZ 平面，沿 Y 軸 extrude
-            const xAxis = new THREE.Vector3(1, 0, 0);
             geo1.rotateOnWorldAxis(xAxis, Math.PI / 2);
             
             const brush1 = new Brush(geo1, baseMat);
@@ -1118,7 +1121,6 @@
             
             // === 使用全域軸旋轉（更清晰、易維護）===
             // Letter 2: 先繞 X 軸轉 90 度，再繞 Z 軸轉 90 度
-            const zAxis = new THREE.Vector3(0, 0, 1);
             geo2.rotateOnWorldAxis(xAxis, Math.PI / 2);  // 第一步：XY → XZ
             geo2.rotateOnWorldAxis(zAxis, Math.PI / 2);  // 第二步：XZ → YZ
             
