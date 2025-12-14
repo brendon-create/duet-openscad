@@ -3,13 +3,10 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     生成 DUET 雙字母 90度相交的 OpenSCAD 腳本
     Z-up 座標系統：XY為水平面，Z軸向上
     
-    參數:
-    - letter1: 第一個字母 (正面，在XZ平面)
-    - letter2: 第二個字母 (側面，在YZ平面，旋轉90度)
-    - font1, font2: Google Font 名稱
-    - size: 目標高度 (沿Z軸，mm)
-    - pendant_x, pendant_y, pendant_z: 墜頭位置微調
-    - pendant_rotation_y: 墜頭繞Z軸旋轉角度
+    正確的建模邏輯：
+    - Letter 1: 在 XZ 平面，沿 Y 軸 extrude
+    - Letter 2: 在 YZ 平面，沿 X 軸 extrude
+    - 兩者天然垂直，取交集
     """
     
     # 動態精度
@@ -20,7 +17,7 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     else:
         fn = 48
     
-    # 深度是高度的 5 倍（確保兩個字母完全交集）
+    # 深度是高度的 5 倍
     depth = size * 5.0
     
     scad_script = f'''
@@ -35,7 +32,7 @@ letter2 = "{letter2}";
 font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};  // Z軸高度
-depth = {depth};         // 深度（高度的5倍）
+depth = {depth};         // extrude 深度（高度的5倍）
 
 pendant_x = {pendant_x};
 pendant_y = {pendant_y};
@@ -47,9 +44,9 @@ pendant_tube_d = target_height * 0.03 * 2;
 
 // === 模組 ===
 
-// 字母 1：在 XZ 平面（正面）
+// Letter 1: XZ 平面，沿 Y 軸 extrude
 module letter1_shape() {{
-    rotate([90, 0, 0])  // 將 text (XY平面) 轉到 XZ 平面
+    rotate([90, 0, 0])  // 將 extrude 後的立體從 XY-Z 轉到 XZ-Y
         linear_extrude(height = depth, center = true)
             text(letter1, 
                  size = target_height, 
@@ -58,10 +55,10 @@ module letter1_shape() {{
                  valign = "center");
 }}
 
-// 字母 2：在 YZ 平面（側面，垂直於字母1）
+// Letter 2: YZ 平面，沿 X 軸 extrude
 module letter2_shape() {{
-    rotate([90, 0, 0])  // 先轉到 XZ 平面
-        rotate([0, 0, 90])  // 再繞 Z 軸轉 90 度到 YZ 平面
+    rotate([90, 0, 0])  // 先轉到 XZ 平面，extrude 沿 -Y
+        rotate([0, 0, 90])  // 再繞 Z 軸轉 90度到 YZ 平面，extrude 沿 -X
             linear_extrude(height = depth, center = true)
                 text(letter2, 
                      size = target_height, 
@@ -72,13 +69,13 @@ module letter2_shape() {{
 
 // 墜頭：torus 環
 module pendant() {{
-    rotate([0, 90, 0])  // 調整環方向
+    rotate([0, 90, 0])
         rotate_extrude($fn = 32)
             translate([pendant_outer_d / 2, 0, 0])
                 circle(d = pendant_tube_d, $fn = 24);
 }}
 
-// === 主體 (Z-up: Z軸向上) ===
+// === 主體 ===
 
 // 1. 雙字母交集
 intersection() {{
@@ -88,7 +85,7 @@ intersection() {{
 
 // 2. 墜頭（在 Z 軸頂部）
 translate([pendant_x, pendant_y, target_height / 2 + pendant_outer_d / 2 + pendant_z])
-    rotate([0, 0, pendant_rotation])  // 繞 Z 軸旋轉
+    rotate([0, 0, pendant_rotation])
         pendant();
 '''
     
