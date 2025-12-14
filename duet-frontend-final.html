@@ -1065,16 +1065,9 @@
 
             const targetHeight = parseInt(document.getElementById('size').value);
             
-            if (mainMesh) {
-                scene.remove(mainMesh);
-                mainMesh.geometry?.dispose();
-                mainMesh.material?.dispose();
-            }
-            if (bailMesh) {
-                scene.remove(bailMesh);
-                bailMesh.geometry?.dispose();
-                bailMesh.material?.dispose();
-            }
+            // 暫存舊物件，等新物件創建完成後再移除（避免畫面空白）
+            const oldMainMesh = mainMesh;
+            const oldBailMesh = bailMesh;
 
             console.log('Loading fonts...'); // Debug
             // 載入字體
@@ -1090,11 +1083,11 @@
                 font: null,
                 size: 50,
                 height: depth,
-                curveSegments: 24,
+                curveSegments: 32,  // 增加到 32（更平滑的曲線）
                 bevelEnabled: true,
-                bevelThickness: 1.5,
-                bevelSize: 0.6,
-                bevelSegments: 12
+                bevelThickness: 2.0,  // 增加 bevel 厚度
+                bevelSize: 0.8,       // 增加 bevel 大小
+                bevelSegments: 16     // 增加 bevel 段數（更平滑）
             };
 
             // === 字母 1 (正面)：將字母平面從 XY 轉到 XZ，擠出方向從 Z 轉到 Y ===
@@ -1174,6 +1167,18 @@
 
             mainMesh = result;
             scene.add(mainMesh);
+
+            // 新物件已添加，現在可以安全移除舊物件
+            if (oldMainMesh) {
+                scene.remove(oldMainMesh);
+                oldMainMesh.geometry?.dispose();
+                oldMainMesh.material?.dispose();
+            }
+            if (oldBailMesh) {
+                scene.remove(oldBailMesh);
+                oldBailMesh.geometry?.dispose();
+                oldBailMesh.material?.dispose();
+            }
 
             console.log('Model generated, creating bail...'); // Debug
             createBail();
@@ -1975,21 +1980,19 @@
                     font1: font1Btn ? (font1Btn.getAttribute('data-selected') || 'Roboto') : 'Roboto',
                     font2: font2Btn ? (font2Btn.getAttribute('data-selected') || 'Roboto') : 'Roboto',
                     size: parseInt(sizeElement.value) || 20,
-                    pendant: {
-                        x: bailXElement ? parseFloat(bailXElement.value) : 0,
-                        y: bailYElement ? parseFloat(bailYElement.value) : 0,
-                        z: bailZElement ? parseFloat(bailZElement.value) : 0,
-                        rotation_y: bailRotationElement ? parseFloat(bailRotationElement.value) : 0
-                    }
+                    bailX: bailXElement ? parseFloat(bailXElement.value) : 0,
+                    bailY: bailYElement ? parseFloat(bailYElement.value) : 0,
+                    bailZ: bailZElement ? parseFloat(bailZElement.value) : 0,
+                    bailRotation: bailRotationElement ? parseFloat(bailRotationElement.value) : 0
                 };
                 
                 console.log('📤 發送參數到後端:', params);
-                console.log('🎯 目標 URL:', `${BACKEND_URL}/generate`);
+                console.log('🎯 目標 URL:', `${BACKEND_URL}/api/generate-stl`);
                 
                 // === 4. 呼叫後端 API ===
                 console.log('⏳ 正在生成 STL，請稍候...');
                 
-                const response = await fetch(`${BACKEND_URL}/generate`, {
+                const response = await fetch(`${BACKEND_URL}/api/generate-stl`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
