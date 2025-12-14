@@ -14,13 +14,14 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
-# 安裝 Google Fonts - 下載完整的 Google Fonts repository
+# 安裝 Google Fonts - 完整克隆並安裝所有 OFL 字體
 RUN mkdir -p /usr/share/fonts/truetype/google-fonts && \
-    git clone --filter=blob:none --sparse https://github.com/google/fonts.git /tmp/google-fonts && \
-    cd /tmp/google-fonts && \
-    git sparse-checkout set ofl && \
-    find ofl -name "*.ttf" -exec cp {} /usr/share/fonts/truetype/google-fonts/ \; && \
-    rm -rf /tmp/google-fonts && \
+    cd /tmp && \
+    git clone https://github.com/google/fonts.git && \
+    cd fonts/ofl && \
+    find . -name "*.ttf" -exec cp {} /usr/share/fonts/truetype/google-fonts/ \; && \
+    cd /tmp && \
+    rm -rf fonts && \
     fc-cache -f -v
 
 # 設定工作目錄
