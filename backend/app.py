@@ -56,10 +56,29 @@ def validate_font(font_name):
     如果字體不存在，OpenSCAD 會使用系統預設字體。
     """
     # 記錄使用的字體（用於除錯）
-    logger.info(f"Using font: {font_name}")
+    logger.info(f"Requesting font: {font_name}")
     
     # 不進行嚴格驗證，允許所有字體
+    # 如果字體真的不存在，OpenSCAD 會在運行時報錯或使用替代字體
     return True
+
+@app.route('/list-fonts', methods=['GET'])
+def list_fonts():
+    """列出系統中所有可用的字體（除錯用）"""
+    try:
+        result = subprocess.run(
+            ['fc-list', ':family'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        fonts = sorted(set(result.stdout.strip().split('\n')))
+        return jsonify({
+            'total': len(fonts),
+            'fonts': fonts
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate_stl():
