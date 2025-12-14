@@ -1,6 +1,7 @@
 def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
     """
     生成 DUET 雙字母 90度相交的 OpenSCAD 腳本
+    完全對應前端 Three.js 的 Z-up 座標系統
     
     參數:
     - letter1: 第一個字母 (正面)
@@ -11,46 +12,44 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     - pendant_rotation_y: 墜頭 Z 軸旋轉角度
     """
     
-    # 動態精度 - 根據尺寸平衡品質與速度
+    # 動態精度
     if size <= 20:
-        fn = 64      # 小尺寸 - 最高精度
+        fn = 64
     elif size <= 25:
-        fn = 56      # 中尺寸 - 高精度
+        fn = 56
     else:
-        fn = 48      # 大尺寸 - 較高精度
+        fn = 48
     
-    # 深度必須非常大（高度的 5 倍）才能確保完全交集
+    # 深度是高度的 5 倍（確保完全交集）
     depth = size * 5.0
     
     scad_script = f'''
-// DUET 雙字母吊飾生成器 (Z-up 座標系統)
-// 優化參數以確保完美無破面 (manifold)
+// DUET 雙字母吊飾生成器
+// Z-up 座標系統（對應前端 Three.js）
 
-$fn = {fn}; // 高精度設定
+$fn = {fn};
 
-// === 參數設定 ===
+// === 參數 ===
 letter1 = "{letter1}";
 letter2 = "{letter2}";
 font1 = "{font1}";
 font2 = "{font2}";
-target_height = {size};      // 目標高度 (Z 軸)
-depth = {depth};             // 深度 (高度的 5 倍,確保完全交集)
+target_height = {size};
+depth = {depth};
 
-// 墜頭參數
 pendant_x = {pendant_x};
 pendant_y = {pendant_y};
 pendant_z = {pendant_z};
-pendant_rotation_y = {pendant_rotation_y};
+pendant_rotation_z = {pendant_rotation_y};  // 注意：前端叫 rotation_y，但實際是繞Z軸
 
-// 墜頭尺寸 (相對於 size)
-pendant_outer_d = target_height * 0.15 * 2;  // 外徑
-pendant_tube_d = target_height * 0.03 * 2;   // 管徑
+pendant_outer_d = target_height * 0.15 * 2;
+pendant_tube_d = target_height * 0.03 * 2;
 
-// === 模組定義 ===
+// === 模組 ===
 
-// 字母 1 模組 (正面, 在 XZ 平面)
+// 字母 1：XY平面 → rotateX(-90) → XZ平面（Z向上）
 module letter1_shape() {{
-    rotate([90, 0, 0])  // 將文字從 XY 平面轉到 XZ 平面
+    rotate([-90, 0, 0])  // 對應前端 rotateX(-Math.PI/2)
         linear_extrude(height = depth, center = true)
             text(letter1, 
                  size = target_height, 
@@ -59,10 +58,10 @@ module letter1_shape() {{
                  valign = "center");
 }}
 
-// 字母 2 模組 (側面, 在 YZ 平面, 垂直於字母1)
+// 字母 2：XY平面 → rotateX(-90) → XZ平面 → rotateZ(90) → YZ平面
 module letter2_shape() {{
-    rotate([90, 0, 0])  // 先轉到 XZ 平面
-        rotate([0, 0, 90])  // 再繞 Z 軸旋轉 90度到 YZ 平面
+    rotate([-90, 0, 0])  // 對應前端 rotateX(-Math.PI/2)
+        rotate([0, 0, 90])  // 對應前端 rotateZ(Math.PI/2)
             linear_extrude(height = depth, center = true)
                 text(letter2, 
                      size = target_height, 
@@ -71,26 +70,25 @@ module letter2_shape() {{
                      valign = "center");
 }}
 
-// 墜頭模組 (沿 Z 軸方向)
+// 墜頭：torus 環
 module pendant() {{
-    rotate([90, 0, 0])  // 將環從 XY 平面轉到 XZ 平面
-        rotate([0, 0, 90])  // 繞 Z 軸旋轉 90度
-            rotate_extrude($fn = 32)
-                translate([pendant_outer_d / 2, 0, 0])
-                    circle(d = pendant_tube_d, $fn = 24);
+    rotate([0, 90, 0])  // 讓環口朝向合適方向
+        rotate_extrude($fn = 32)
+            translate([pendant_outer_d / 2, 0, 0])
+                circle(d = pendant_tube_d, $fn = 24);
 }}
 
-// === 主組件 (Z-up 座標系統) ===
+// === 主體 ===
 
-// 1. 雙字母交集 (核心邏輯!)
+// 1. 雙字母交集
 intersection() {{
     letter1_shape();
     letter2_shape();
 }}
 
-// 2. 墜頭 (放在頂部, Z 軸正方向)
+// 2. 墜頭（在Z軸頂部）
 translate([pendant_x, pendant_y, target_height / 2 + pendant_outer_d / 2 + pendant_z])
-    rotate([0, 0, pendant_rotation_y])  // 繞 Z 軸旋轉
+    rotate([0, 0, pendant_rotation_z])
         pendant();
 '''
     
