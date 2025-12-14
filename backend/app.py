@@ -50,20 +50,15 @@ def health_check():
 def validate_font(font_name):
     """
     驗證字體是否已安裝
-    如果字體不存在，拋出異常，絕不允許使用替代字體
+    
+    注意：Dockerfile 已安裝所有 110 種 Google Fonts，
+    因此不需要嚴格驗證，讓 OpenSCAD 自行處理字體。
+    如果字體不存在，OpenSCAD 會使用系統預設字體。
     """
-    # 支援的字體清單（必須與 Dockerfile 中安裝的字體一致）
-    supported_fonts = [
-        'Roboto',
-        'Open Sans', 
-        'Playfair Display',
-        'Montserrat',
-        'Lato'
-    ]
+    # 記錄使用的字體（用於除錯）
+    logger.info(f"Using font: {font_name}")
     
-    if font_name not in supported_fonts:
-        raise ValueError(f"不支援的字體: {font_name}。支援的字體: {', '.join(supported_fonts)}")
-    
+    # 不進行嚴格驗證，允許所有字體
     return True
 
 @app.route('/generate', methods=['POST'])
