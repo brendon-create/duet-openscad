@@ -47,6 +47,25 @@ def health_check():
         'temp_dir': TEMP_DIR
     })
 
+def validate_font(font_name):
+    """
+    驗證字體是否已安裝
+    如果字體不存在，拋出異常，絕不允許使用替代字體
+    """
+    # 支援的字體清單（必須與 Dockerfile 中安裝的字體一致）
+    supported_fonts = [
+        'Roboto',
+        'Open Sans', 
+        'Playfair Display',
+        'Montserrat',
+        'Lato'
+    ]
+    
+    if font_name not in supported_fonts:
+        raise ValueError(f"不支援的字體: {font_name}。支援的字體: {', '.join(supported_fonts)}")
+    
+    return True
+
 @app.route('/generate', methods=['POST'])
 def generate_stl():
     """生成 STL 檔案的主要端點"""
@@ -57,15 +76,30 @@ def generate_stl():
         # 提取參數
         letter1 = data.get('letter1', 'D')
         letter2 = data.get('letter2', 'T')
-        font1 = data.get('font1', 'Liberation Sans:style=Bold')
-        font2 = data.get('font2', 'Liberation Sans:style=Bold')
+        font1 = data.get('font1', 'Roboto')
+        font2 = data.get('font2', 'Roboto')
         size = data.get('size', 20)
-        pendant_config = data.get('pendant', {
-            'x': 0,
-            'y': 0,
-            'z': 0,
-            'rotation_y': 0
-        })
+        
+        # 支援兩種參數格式：扁平或嵌套
+        if 'bailX' in data:
+            # 扁平格式（前端發送的）
+            pendant_x = data.get('bailX', 0)
+            pendant_y = data.get('bailY', 0)
+            pendant_z = data.get('bailZ', 0)
+            pendant_rotation = data.get('bailRotation', 0)
+        else:
+            # 嵌套格式（舊版）
+            pendant_config = data.get('pendant', {})
+            pendant_x = pendant_config.get('x', 0)
+            pendant_y = pendant_config.get('y', 0)
+            pendant_z = pendant_config.get('z', 0)
+            pendant_rotation = pendant_config.get('rotation_y', 0)
+        
+        logger.info(f"Pendant params: x={pendant_x}, y={pendant_y}, z={pendant_z}, rotation={pendant_rotation}")
+        
+        # 🔒 驗證字體
+        validate_font(font1)
+        validate_font(font2)
         
         # 生成 OpenSCAD 腳本
         scad_content = generate_scad_script(
@@ -74,10 +108,10 @@ def generate_stl():
             font1=font1,
             font2=font2,
             size=size,
-            pendant_x=pendant_config.get('x', 0),
-            pendant_y=pendant_config.get('y', 0),
-            pendant_z=pendant_config.get('z', 0),
-            pendant_rotation_y=pendant_config.get('rotation_y', 0)
+            pendant_x=pendant_x,
+            pendant_y=pendant_y,
+            pendant_z=pendant_z,
+            pendant_rotation_y=pendant_rotation
         )
         
         # 建立臨時檔案
