@@ -873,8 +873,7 @@
         // ============================================================
 
         // === 後端 API 設定 ===
-        const BACKEND_URL = 'http://localhost:5001';  // 本地測試用
-        // const BACKEND_URL = 'https://your-app.onrender.com';  // 部署後改用這個
+        const BACKEND_URL = 'https://duet-backend-wlw8.onrender.com';  // Render 雲端後端
 
         console.log('🔧 後端 URL:', BACKEND_URL);
 
@@ -903,7 +902,7 @@
             } catch (error) {
                 console.error('❌ 後端連接失敗:', error);
                 console.error('請確認：');
-                console.error('1. 後端是否已啟動 (python app.py)');
+                console.error('1. 網路連線是否正常');
                 console.error('2. 後端 URL 是否正確:', BACKEND_URL);
                 return false;
             }
@@ -983,8 +982,9 @@
             
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.up.set(0, 0, 1); // Z-up 系統
-            // 旋轉180度（從 Y=40 改為 Y=-80）並增加距離
-            camera.position.set(0, -80, 0);
+            // 從物件前方稍微偏右上，15度俯角觀看 45 度夾角
+            camera.position.set(50, -70, 15);  // X=50(右), Y=-70(前), Z=15(上)
+            camera.lookAt(0, 0, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1099,13 +1099,15 @@
             geo1.scale(scale1, scale1, scale1);
             geo1.center();
             
-            // 將字母平面從 XY 轉到 XZ，擠出方向從 Z 轉到 Y
-            geo1.rotateX(Math.PI / 2);
+            // === 使用全域軸旋轉（更清晰、易維護）===
+            // Letter 1: XZ 平面，沿 Y 軸 extrude
+            const xAxis = new THREE.Vector3(1, 0, 0);
+            geo1.rotateOnWorldAxis(xAxis, Math.PI / 2);
             
             const brush1 = new Brush(geo1, baseMat);
             brush1.updateMatrixWorld();
 
-            // === 字母 2 (側面)：轉到 XZ 平面 → 繞 Z 軸旋轉 90 度 ===
+            // === 字母 2 (側面)：YZ 平面，沿 X 軸 extrude ===
             const geo2 = new TextGeometry(l2, { ...params, font: f2 });
             geo2.computeBoundingBox();
             const bbox2 = geo2.boundingBox;
@@ -1114,10 +1116,11 @@
             geo2.scale(scale2, scale2, scale2);
             geo2.center();
             
-            // 將字母平面從 XY 轉到 XZ
-            geo2.rotateX(Math.PI / 2);
-            // 繞新的高度軸 Z 旋轉 90 度
-            geo2.rotateZ(Math.PI / 2);
+            // === 使用全域軸旋轉（更清晰、易維護）===
+            // Letter 2: 先繞 X 軸轉 90 度，再繞 Z 軸轉 90 度
+            const zAxis = new THREE.Vector3(0, 0, 1);
+            geo2.rotateOnWorldAxis(xAxis, Math.PI / 2);  // 第一步：XY → XZ
+            geo2.rotateOnWorldAxis(zAxis, Math.PI / 2);  // 第二步：XZ → YZ
             
             const brush2 = new Brush(geo2, baseMat);
             brush2.updateMatrixWorld();
@@ -1992,7 +1995,7 @@
                 // === 4. 呼叫後端 API ===
                 console.log('⏳ 正在生成 STL，請稍候...');
                 
-                const response = await fetch(`${BACKEND_URL}/api/generate-stl`, {
+                const response = await fetch(`${BACKEND_URL}/generate`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2070,14 +2073,17 @@
                 console.error('❌ 生成 STL 錯誤:', error);
                 console.error('錯誤堆疊:', error.stack);
                 
-                let userMessage = `❌ 生成失敗\n\n`;
+                let userMessage = `❌ STL 生成失敗\n\n`;
                 userMessage += `錯誤訊息: ${error.message}\n\n`;
-                userMessage += `請檢查：\n`;
-                userMessage += `1. 後端服務是否已啟動\n`;
-                userMessage += `2. 在終端執行: python app.py\n`;
-                userMessage += `3. OpenSCAD 是否已安裝\n`;
-                userMessage += `4. 檢查瀏覽器 Console (F12)\n\n`;
-                userMessage += `當前後端 URL: ${BACKEND_URL}`;
+                userMessage += `可能原因：\n`;
+                userMessage += `1. 網路連線問題\n`;
+                userMessage += `2. 後端服務暫時忙碌中\n`;
+                userMessage += `3. 字體或參數不支援\n\n`;
+                userMessage += `建議：\n`;
+                userMessage += `• 請稍後再試\n`;
+                userMessage += `• 或嘗試選擇不同字體\n`;
+                userMessage += `• 檢查網路連線\n\n`;
+                userMessage += `技術資訊: ${BACKEND_URL}`;
                 
                 alert(userMessage);
                 
