@@ -128,6 +128,14 @@ def generate_stl():
             pendant_rotation_y=pendant_rotation
         )
         
+        # 記錄 Letter 2 的旋轉邏輯（用於驗證版本）
+        if 'rotate([0, 0, 90])' in scad_content:
+            logger.info("✅ Using nested rotation (correct version)")
+        elif 'rotate([90, 0, 90])' in scad_content:
+            logger.info("❌ Using single rotation (old version)")
+        else:
+            logger.warning("⚠️ Rotation pattern not recognized")
+        
         # 建立臨時檔案
         with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
             scad_file.write(scad_content)
