@@ -53,8 +53,8 @@ module letter1_shape() {{
 }}
 
 module letter2_shape() {{
-    rotate([90, 0, 0])  // 外層：對應 Three.js 的第一個 rotateX
-        rotate([0, 0, 90])  // 內層：對應 Three.js 的第二個 rotateZ
+    rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
+        rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
             linear_extrude(height=depth, center=true)
                 letter_geometry(letter2, font2, target_height);
 }}
