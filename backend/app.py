@@ -50,10 +50,11 @@ def health_check():
 def get_available_fonts():
     """
     獲取系統中所有可用的字體家族名稱
+    從 fc-list 輸出中提取純字體名稱（移除路徑和 style）
     """
     try:
         result = subprocess.run(
-            ['fc-list', ':family'],
+            ['fc-list'],  # 不用 :family，獲取完整信息
             capture_output=True,
             text=True,
             timeout=10
@@ -64,11 +65,24 @@ def get_available_fonts():
         
         font_families = set()
         for line in result.stdout.strip().split('\n'):
-            if line:
-                for family in line.split(','):
-                    clean_name = family.strip()
-                    if clean_name:
-                        font_families.add(clean_name)
+            if line and ':' in line:
+                # 格式: /path/to/font.ttf: Family Name:style=Style
+                # 或: /path/to/font.ttf: Family Name
+                parts = line.split(':', 1)
+                if len(parts) >= 2:
+                    font_info = parts[1].strip()
+                    
+                    # 移除 style 資訊
+                    if ':style=' in font_info:
+                        font_name = font_info.split(':style=')[0].strip()
+                    else:
+                        font_name = font_info.strip()
+                    
+                    # 處理逗號分隔的別名
+                    for name in font_name.split(','):
+                        clean_name = name.strip()
+                        if clean_name:
+                            font_families.add(clean_name)
         
         return font_families
         
@@ -102,12 +116,12 @@ def validate_font(font_name):
 def list_fonts():
     """
     列出系統中所有可用的字體家族名稱（用於前端過濾）
-    返回格式：{"fonts": ["Roboto", "Chewy", ...]}
+    返回格式：{"fonts": ["Roboto", "Alex Brush", ...]}
     """
     try:
-        # 使用 fc-list 列出所有字體家族
+        # 使用 fc-list 列出所有字體（包含完整信息）
         result = subprocess.run(
-            ['fc-list', ':family'],
+            ['fc-list'],  # 移除 :family 參數
             capture_output=True,
             text=True,
             timeout=10
@@ -118,18 +132,27 @@ def list_fonts():
             return jsonify({'error': 'Failed to list fonts'}), 500
         
         # 解析字體名稱
-        # fc-list :family 的輸出格式：
-        # Family Name
-        # Family Name,Alternative Name
-        # 每行一個字體家族
+        # fc-list 的輸出格式：
+        # /path/to/font.ttf: Family Name:style=Style
+        # 提取純字體家族名稱
         font_families = set()
         for line in result.stdout.strip().split('\n'):
-            if line:
-                # 處理多個家族名稱（逗號分隔）
-                for family in line.split(','):
-                    clean_name = family.strip()
-                    if clean_name:
-                        font_families.add(clean_name)
+            if line and ':' in line:
+                parts = line.split(':', 1)
+                if len(parts) >= 2:
+                    font_info = parts[1].strip()
+                    
+                    # 移除 style 資訊
+                    if ':style=' in font_info:
+                        font_name = font_info.split(':style=')[0].strip()
+                    else:
+                        font_name = font_info.strip()
+                    
+                    # 處理多個家族名稱（逗號分隔）
+                    for family in font_name.split(','):
+                        clean_name = family.strip()
+                        if clean_name:
+                            font_families.add(clean_name)
         
         # 排序並返回
         sorted_fonts = sorted(font_families)
@@ -141,8 +164,8 @@ def list_fonts():
         })
         
     except Exception as e:
-        logger.error(f"Error listing fonts: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in list_fonts: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate_stl():
