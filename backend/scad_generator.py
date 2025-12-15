@@ -62,7 +62,7 @@ module letter2_shape() {{
 
 module bail() {{
     translate([pos_x, pos_y, pos_z])
-        rotate([0, 0, -bail_rotation])
+        rotate([0, 0, bail_rotation + 90])  # 用戶旋轉 + 固定 90°
             rotate([90, 0, 0])
                 rotate_extrude(angle=360, $fn=32)
                     translate([bail_radius, 0, 0])
