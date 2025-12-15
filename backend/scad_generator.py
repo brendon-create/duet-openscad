@@ -21,6 +21,7 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     bail_radius = 2.0
     bail_tube = 0.7
     bail_rotation_with_offset = pendant_rotation_y + 90
+    print(f"DEBUG: pendant_rotation_y={pendant_rotation_y}, bail_rotation_with_offset={bail_rotation_with_offset}")
     
     # 墜頭位置（修正映射）
     pos_x = pendant_x  # X 就是 X
@@ -63,7 +64,7 @@ module letter2_shape() {{
 
 module bail() {{
     translate([pos_x, pos_y, pos_z])
-        rotate([0, 0, bail_rotation])  # 用戶旋轉 + 固定 90°
+        rotate([0, 0, bail_rotation])  # 用戶旋轉
             rotate([90, 0, 0])
                 rotate_extrude(angle=360, $fn=32)
                     translate([bail_radius, 0, 0])
