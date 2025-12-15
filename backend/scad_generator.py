@@ -18,8 +18,8 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
         fn = 48
     
     depth = size * 5.0
-    bail_radius = size * 2.0
-    bail_tube = size * 0.7
+    bail_radius = 2.0
+    bail_tube = 0.7
     
     # 墜頭位置（修正映射）
     pos_x = pendant_x
