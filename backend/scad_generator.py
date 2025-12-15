@@ -20,6 +20,7 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     depth = size * 5.0
     bail_radius = 2.0
     bail_tube = 0.7
+    bail_rotation_with_offset = pendant_rotation_y + 90
     
     # 墜頭位置（修正映射）
     pos_x = pendant_x  # X 就是 X
@@ -40,7 +41,7 @@ bail_tube = {bail_tube};
 pos_x = {pos_x};
 pos_y = {pos_y};
 pos_z = {pos_z};
-bail_rotation = {pendant_rotation_y};
+bail_rotation = {bail_rotation_with_offset};
 
 module letter_geometry(char, font_name, target_h) {{
     resize([0, target_h, 0], auto=true)
