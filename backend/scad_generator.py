@@ -21,7 +21,10 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     bail_radius = 2.0
     bail_tube = 0.7
     bail_rotation_with_offset = pendant_rotation_y + 90
-    print(f"DEBUG: pendant_rotation_y={pendant_rotation_y}, bail_rotation_with_offset={bail_rotation_with_offset}")
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔧 DEBUG: pendant_rotation_y={pendant_rotation_y}, bail_rotation_with_offset={bail_rotation_with_offset}")
     
     # 墜頭位置（修正映射）
     pos_x = pendant_x  # X 就是 X
