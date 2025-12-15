@@ -6,7 +6,10 @@
     <title>DUET 創作者深度訪談</title>
     <style>
         :root { --gold: #d4af37; --bg: #0a0e14; }
-        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg); color: #fff; line-height: 1.6; padding: 20px; margin: 0; }
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg); color: #fff; line-height: 1.6; padding: 20px; margin: 0; /* --- 修正 GitHub 顯示過大問題，不影響內容 --- */
+    zoom: 0.5; /* 縮小一半 */
+    -moz-transform: scale(0.5); /* 針對 Firefox 的縮放 */
+    -moz-transform-origin: top center; /* 縮放中心點設在上方中間 */}
         .container { max-width: 850px; margin: 40px auto; background: rgba(255,255,255,0.03); padding: 50px; border-radius: 24px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
         h1 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 4px; font-weight: 300; }
         .concept-note { text-align: center; color: #aaa; font-size: 15px; margin-bottom: 40px; padding: 0 20px; line-height: 1.8; }
