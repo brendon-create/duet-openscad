@@ -940,40 +940,27 @@
         
         // 完整字體清單（前端定義）
         const allFonts = [
-            // 1. 經典/高對比襯線體 (Serif - Classic/Display)
-            "Playfair Display", "Cinzel", "Bodoni Moda", "Libre Baskerville", "Cormorant Garamond", 
-            "EB Garamond", "Taviraj", "Yeseva One", "Caudex", "Prata",
-            "Spectral", "Alegreya", "Vollkorn", "Philosopher", "Marcellus",
-            "Forum", "Sorts Mill Goudy", "Castoro", "Stint Ultra Expanded", "BioRhyme Expanded",
-
-            // 2. 幾何/人文/科技無襯線體 (Sans Serif - Distinct)
-            "Roboto", "Inter", "Gabarito", "Lexend", "Space Grotesk", 
-            "Quicksand", "Work Sans", "Barlow", "Kanit", "Bebas Neue",
-            "Anton", "Fjalla One", "Josefin Sans", "Spline Sans Mono", "Staatliches",
-            "Oswald", "Ruwudu", "Chakra Petch", "Exo 2", "Rajdhani",
-
-            // 3. 粗襯線體 / 復古 / 趣味顯示 (Slab / Retro / Display)
-            "Abril Fatface", "Alfa Slab One", "Zilla Slab", "Rokkitt", "BioRhyme",
-            "Righteous", "Bungee", "Plaster", "Ultra", "Metal Mania", 
-            "Monoton", "Fascinate Inline", "Graduate", "Uncial Antiqua", "Rye",
-            "Creepster", "Montez", "Crete Round", "Luckiest Guy", "Titan One", 
-
-            // 4. 手寫體 / 筆刷 / 藝術感 (Handwriting / Script)
-            "Pacifico", "Lobster", "Cookie", "Dancing Script", "Kaushan Script",
-            "Satisfy", "Great Vibes", "Sacramento", "Comforter", "Yellowtail",
-            "Permanent Marker", "Rock Salt", "Gochi Hand", "Caveat", "Shadows Into Light",
-            "Indie Flower", "Gloria Hallelujah", "Kalam", "Courgette", "Leckerli One",
-            
-            // 5. 特殊與單寬度字體 (Special & Monospace)
-            "Press Start 2P", "VT323", "Space Mono", "IBM Plex Mono", "Source Code Pro",
-            "Cousine", "Share Tech Mono", "Inconsolata", "Special Elite", "Chivo Mono", 
-            "Baloo 2", "Sniglet", "Bubblegum Sans", "Chewy", "Varela Round",
-            "Dosis", "Kodchasan", "Mali", "Itim", "Patrick Hand",
-
-            // 6. 其他高識別度字體 (High-Contrast Others)
-            "Zen Dots", "Unica One", "Seymour One", "Ruslan Display", "Cabin", 
-            "Nosifier", "Vibes", "Croissant One", "Emilys Candy", "Sarala" 
-        ];
+    "Abel", "Abril Fatface", "Advent Pro", "Alegreya", "Alex Brush",
+    "Alfa Slab One", "Alice", "Allura", "Amatic SC", "Amiri",
+    "Anton", "Arapey", "Archivo", "Armata", "Artifika",
+    "Arvo", "Audiowide", "Average", "Baloo 2", "Bangers",
+    "Bebas Neue", "Belgrano", "Bentham", "Bitter", "Bree Serif",
+    "Bubblegum Sans", "Bungee", "Cabin", "Cantata One", "Caudex",
+    "Caveat", "Chivo", "Cinzel", "Comfortaa", "Commissioner",
+    "Cookie", "Copse", "Cormorant Garamond", "Courier Prime", "Coustard",
+    "Creepster", "Cutive Mono", "DM Serif Text", "Dancing Script", "Dosis",
+    "EB Garamond", "Eczar", "Encode Sans", "Fauna One", "Fira Code",
+    "Fira Sans", "Fjalla One", "Fugaz One", "Gelasio", "Gloria Hallelujah",
+    "Great Vibes", "Handlee", "Hind", "Holtwood One SC", "Inconsolata",
+    "Indie Flower", "Jost", "Kalam", "Kanit", "Karla",
+    "Lexend", "Lobster", "Merriweather", "Neuton", "Nunito",
+    "Old Standard TT", "Orbitron", "Oswald", "Outfit", "Pacifico",
+    "Passion One", "Pathway Gothic One", "Patrick Hand", "Paytone One", "Playfair Display",
+    "Poppins", "Prata", "Quicksand", "Righteous", "Rubik",
+    "Russo One", "Sacramento", "Secular One", "Shadows Into Light", "Share Tech Mono",
+    "Shrikhand", "Sniglet", "Space Grotesk", "Space Mono", "Spectral",
+    "Tangerine", "Titan One", "Varela Round", "Vollkorn", "Zilla Slab"
+];
         
         // 初始化可用字體清單
         async function initAvailableFonts() {
@@ -1043,7 +1030,7 @@
             controls.dampingFactor = 0.05;
             controls.target.set(0, 0, 0);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
             scene.add(ambientLight);
 
             const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -1889,8 +1876,8 @@
                 
                 const thumbnailScene = new THREE.Scene();
                 const thumbnailCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
-                // 45度 XY 角度，15度俯角
-                thumbnailCamera.position.set(30, 30, 10);
+                thumbnailCamera.up.set(0, 0, 1);  // Z-up
+                thumbnailCamera.position.set(50, -70, 15);  // 使用主相機角度
                 thumbnailCamera.lookAt(0, 0, 0);
                 
                 // 添加燈光
