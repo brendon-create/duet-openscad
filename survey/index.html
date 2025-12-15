@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DUET 創作者深度訪談</title>
+    <style>
+        :root { --gold: #d4af37; --bg: #0a0e14; }
+        
+        html { -webkit-text-size-adjust: 100%; }
+
+        body { 
+            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; 
+            background-color: var(--bg); 
+            color: #fff; 
+            line-height: 1.6; 
+            padding: 40px 20px; 
+            margin: 0; 
+            font-size: 13px; /* 整體字體縮小 */
+        }
+
+        .container { 
+            max-width: 580px; /* 寬度進一步縮減，增加精緻感 */
+            margin: 0 auto; 
+            background: rgba(255,255,255,0.02); 
+            padding: 40px; 
+            border-radius: 12px; 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255,255,255,0.05); 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5); 
+        }
+
+        h1 { 
+            color: var(--gold); 
+            text-align: center; 
+            margin-bottom: 12px; 
+            letter-spacing: 6px; 
+            font-weight: 300; 
+            font-size: 18px; /* 標題縮小 */
+        }
+
+        .concept-note { 
+            text-align: center; 
+            color: #666; 
+            font-size: 11px; 
+            margin-bottom: 40px; 
+            line-height: 2; 
+            letter-spacing: 1.5px;
+        }
+
+        .question-group { 
+            margin-bottom: 30px; 
+            padding-bottom: 20px; 
+            border-bottom: 1px solid rgba(255,255,255,0.04); 
+        }
+
+        label { 
+            display: block; 
+            font-size: 12px; /* 標籤微小化 */
+            margin-bottom: 10px; 
+            color: var(--gold); 
+            font-weight: 400; 
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        .info-row { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; }
+
+        input[type="text"], input[type="email"], textarea, select {
+            width: 100%; padding: 10px; background: rgba(255,255,255,0.04); 
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 4px; color: #fff; font-size: 13px; transition: 0.3s; box-sizing: border-box;
+        }
+        input:focus, textarea:focus { outline: none; border-color: rgba(212, 175, 55, 0.5); background: rgba(255,255,255,0.07); }
+
+        /* 核心設計：字體選擇區塊修正 */
+        .font-selection-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; /* 強制左右並排 */
+            gap: 20px; /* 增加間距避免重疊 */
+            margin-top: 5px;
+        }
+
+        .font-trigger {
+            width: 100%; 
+            padding: 12px 10px; 
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 4px; 
+            color: var(--gold); 
+            font-size: 12px; 
+            cursor: pointer; 
+            text-align: center;
+            transition: 0.3s;
+        }
+        .font-trigger:hover { background: rgba(212, 175, 55, 0.1); }
+
+        .image-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+        .img-card { cursor: pointer; border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; transition: 0.4s; background: #000; }
+        .img-card img { width: 100%; height: 110px; object-fit: cover; display: block; filter: grayscale(100%); opacity: 0.4; transition: 0.4s; }
+        #mag-options .img-card img { height: 160px; object-fit: contain; }
+        .img-card p { font-size: 10px; text-align: center; padding: 8px 4px; color: #555; margin: 0; letter-spacing: 1px; }
+        .img-card.selected { border-color: var(--gold); }
+        .img-card.selected img { filter: grayscale(0%); opacity: 1; }
+        .img-card.selected p { color: var(--gold); }
+
+        .submit-btn { 
+            width: 100%; padding: 14px; background: none; 
+            color: var(--gold); border: 1px solid var(--gold); 
+            border-radius: 4px; font-weight: 300; cursor: pointer; 
+            font-size: 14px; margin-top: 40px; transition: 0.4s; letter-spacing: 4px; 
+        }
+        .submit-btn:hover { background: var(--gold); color: #000; }
+
+        #font-selector-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 9999; padding: 40px; box-sizing: border-box; }
+        .modal-body { max-width: 900px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; }
+        .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; overflow-y: auto; }
+        .font-card { background: rgba(255,255,255,0.03); padding: 20px 10px; border-radius: 4px; text-align: center; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); }
+        .preview-char { font-size: 32px; margin-bottom: 5px; color: #fff; }
+
+        @media (max-width: 600px) {
+            .container { padding: 30px 20px; }
+            .info-row { grid-template-columns: 1fr; gap: 10px; }
+            .font-selection-grid { grid-template-columns: 1fr; gap: 10px; } /* 手機上改為垂直避免擠壓 */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DUET Interview</h1>
+    <p class="concept-note">
+        「您的回覆將成為這件作品最珍貴的設計靈魂。」<br>
+        能傾聽這段交織的故事是我們的榮幸。
+    </p>
+    
+    <div class="question-group info-row">
+        <div>
+            <label>您的姓名</label>
+            <input type="text" id="name" placeholder="Name">
+        </div>
+        <div>
+            <label>您的 E-mail</label>
+            <input type="email" id="email" placeholder="Email">
+        </div>
+    </div>
+
+    <div class="question-group">
+        <label>1. 選定英文字母組合</label>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <input type="text" id="L1" maxlength="1" placeholder="A" style="width:50px; text-align:center; font-size: 18px;" oninput="updateLabels()">
+            <input type="text" id="L2" maxlength="1" placeholder="B" style="width:50px; text-align:center; font-size: 18px;" oninput="updateLabels()">
+        </div>
+        <textarea id="Q1_reason" rows="2" placeholder="字母對您的特殊意義..."></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>2. 你們之間最難忘的一個共同點？</label>
+        <textarea id="Q2" rows="2"></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>3. 這份關係為生命多出了哪些寶貴元素？</label>
+        <textarea id="Q3" rows="2"></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>4. 形容對方的三個形容詞</label>
+        <input type="text" id="Q4" placeholder="例如：優雅、沈穩、純粹">
+    </div>
+
+    <div class="question-group">
+        <label>5. 他對您來說為什麼如此重要？</label>
+        <textarea id="Q5" rows="3"></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>6. 相處模式最像哪種音樂曲風？</label>
+        <select id="Q6">
+            <option value="" disabled selected>Select Genre</option>
+            <option value="平靜悠揚的鋼琴二重奏">平靜悠揚的鋼琴二重奏</option>
+            <option value="互補且自由的爵士即興">互補且自由的爵士即興</option>
+            <option value="澎湃激昂的交響樂">澎湃激昂的交響樂</option>
+            <option value="純粹和諧的阿卡貝拉">純粹和諧的阿卡貝拉</option>
+            <option value="溫暖日常的民謠吉他">溫暖日常的民謠吉他</option>
+            <option value="充滿張力的探戈舞曲">充滿張力的探戈舞曲</option>
+        </select>
+    </div>
+
+    <div class="question-group">
+        <label>7. 如果這是一處空間，哪種氣氛最接近？</label>
+        <div class="image-options" id="room-options">
+            <div class="img-card" onclick="selectImg('room', '水泥工業', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%A1%AC%E6%B4%BE%E6%B0%B4%E6%B3%A5%E5%B7%A5%E6%A5%AD%E9%A2%A8.jpg"><p>硬派水泥</p></div>
+            <div class="img-card" onclick="selectImg('room', '溫潤木質', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%BA%AB%E6%BD%A4%E6%9C%A8%E8%B3%AA%E5%8C%97%E6%AD%90%E9%A2%A8.jpg"><p>溫潤木質</p></div>
+            <div class="img-card" onclick="selectImg('room', '自然植栽', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%A4%8D%E6%A0%BD%E7%B6%A0%E6%84%8F%E9%A2%A8.jpg"><p>自然植栽</p></div>
+            <div class="img-card" onclick="selectImg('room', '極簡主義', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B4%94%E7%B2%B9%E6%A5%B5%E7%B0%A1%E9%A2%A8.jpg"><p>純粹極簡</p></div>
+        </div>
+        <input type="hidden" id="Q7_val">
+    </div>
+
+    <div class="question-group">
+        <label>8. 雜誌封面排版直覺</label>
+        <div class="image-options" id="mag-options">
+            <div class="img-card" onclick="selectImg('mag', '時尚留白', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%99%82%E5%B0%9A%E7%95%99%E7%99%BD%E9%9B%9C%E8%AA%8C.jpg"><p>時尚留白</p></div>
+            <div class="img-card" onclick="selectImg('mag', '大膽色塊', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E5%A4%A7%E8%86%BD%E8%89%B2%E5%A1%8A%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>大膽色塊</p></div>
+            <div class="img-card" onclick="selectImg('mag', '人文藝術', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E4%BA%BA%E6%96%87%E8%97%9D%E8%A1%93%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>人文藝術</p></div>
+            <div class="img-card" onclick="selectImg('mag', '經典排版', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B6%93%E5%85%B8%E6%8E%92%E7%89%88%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>經典排版</p></div>
+        </div>
+        <input type="hidden" id="Q8_val">
+    </div>
+
+    <div class="question-group">
+        <label>9. 核心設計：字體選擇</label>
+        <div class="font-selection-grid">
+            <div>
+                <label id="label_L1" style="font-size: 10px; opacity: 0.5;">字母 A 字體：</label>
+                <div id="font1_display" class="font-trigger" onclick="openFontSelector(1)">點擊挑選</div>
+            </div>
+            <div>
+                <label id="label_L2" style="font-size: 10px; opacity: 0.5;">字母 B 字體：</label>
+                <div id="font2_display" class="font-trigger" onclick="openFontSelector(2)">點擊挑選</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="question-group">
+        <label>10. 選擇這兩款字體的原因？</label>
+        <textarea id="Q10_reason" rows="2"></textarea>
+    </div>
+
+    <button id="submitBtn" class="submit-btn" onclick="submitForm()">COMMIT RESPONSE</button>
+</div>
+
+<div id="font-selector-modal">
+    <div class="modal-body">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 id="modal-title" style="color: var(--gold); font-size: 16px; letter-spacing: 2px;">SELECT TYPEFACE</h2>
+            <button onclick="closeFontSelector()" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">&times;</button>
+        </div>
+        <div class="font-grid" id="font-list-container"></div>
+    </div>
+</div>
+
+<script>
+    const allFonts = ["Abel", "Abril Fatface", "Aclonica", "Acme", "Aladin", "Alex Brush", "Alfa Slab One", "Alice", "Alike", "Amatic SC", "Amaranth", "Amita", "Andada Pro", "Annie Use Your Telescope", "Anonymous Pro", "Antic", "Anton", "Arapey", "Arimo", "Arvo", "Asap", "Assistant", "Audiowide", "Balsamiq Sans", "Bangers", "Barlow", "Bebas Neue", "Belgrano", "Belleza", "BenchNine", "Berkshire Swash", "Bevan", "Bigelow Rules", "Bitter", "Black Ops One", "Bokor", "Bowlby One SC", "Bree Serif", "Bubblegum Sans", "Cabin", "Cairo", "Calligraffitti", "Candal", "Cantarell", "Cardo", "Carrois Gothic", "Catamaran", "Caveat", "Chakra Petch", "Changa One", "Chewy", "Chivo", "Cinzel", "Comfortaa", "Coming Soon", "Concert One", "Cookie", "Courgette", "Creepster", "Crimson Text", "Cuprum", "Dancing Script", "Didact Gothic", "Domine", "Dosis", "EB Garamond", "Economica", "Exo", "Exo 2", "Fira Sans", "Fjalla One", "Fredoka One", "Gloria Hallelujah", "Great Vibes", "Handlee", "Indie Flower", "Inconsolata", "Inter", "Josefin Sans", "Jost", "Kanit", "Kaushan Script", "Lato", "Libre Baskerville", "Lobster", "Lora", "Luckiest Guy", "Marck Script", "Merriweather", "Montserrat", "Nanum Gothic", "Noto Sans", "Nunito", "Open Sans", "Oswald", "Pacifico", "Playfair Display", "Poppins", "Quicksand", "Raleway", "Righteous", "Roboto", "Sacramento", "Satisfy", "Shadows Into Light", "Tangerine", "Work Sans"];
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwqPAlaIjQR3G4xn6ZMe4gx_DAyJeMVBrQIZzpoUQYwtAy7oQhlrt_ZVCkoShExXV6K7w/exec";
+    let activeSlot = 1;
+
+    function updateLabels() {
+        const char1 = document.getElementById('L1').value.toUpperCase() || "A";
+        const char2 = document.getElementById('L2').value.toUpperCase() || "B";
+        document.getElementById('label_L1').textContent = `字母 ${char1} 字體：`;
+        document.getElementById('label_L2').textContent = `字母 ${char2} 字體：`;
+    }
+
+    function openFontSelector(slot) {
+        activeSlot = slot;
+        const targetChar = (slot === 1) ? (document.getElementById('L1').value.toUpperCase() || "A") : (document.getElementById('L2').value.toUpperCase() || "B");
+        document.getElementById('modal-title').textContent = `SELECT FOR LETTER ${targetChar}`;
+        const container = document.getElementById('font-list-container');
+        container.innerHTML = '';
+        allFonts.forEach(font => {
+            const card = document.createElement('div');
+            card.className = 'font-card';
+            card.style.fontFamily = `'${font}', sans-serif`;
+            card.innerHTML = `<div class="preview-char">${targetChar}</div><div style="font-size:9px; opacity:0.4;">${font}</div>`;
+            const link = document.createElement('link');
+            link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/ /g, '+')}&display=swap`;
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+            card.onclick = () => {
+                const displayDiv = document.getElementById(`font${activeSlot}_display`);
+                displayDiv.textContent = font;
+                displayDiv.style.fontFamily = `'${font}', sans-serif`;
+                closeFontSelector();
+            };
+            container.appendChild(card);
+        });
+        document.getElementById('font-selector-modal').style.display = 'block';
+    }
+
+    function closeFontSelector() { document.getElementById('font-selector-modal').style.display = 'none'; }
+    function selectImg(type, val, el) {
+        document.querySelectorAll(`#${type}-options .img-card`).forEach(card => card.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById(`Q${type==='room'?7:8}_val`).value = val;
+    }
+
+    function submitForm() {
+        const btn = document.getElementById('submitBtn');
+        const name = document.getElementById('name').value;
+        if(!name) { alert("Please enter your name"); return; }
+        btn.disabled = true;
+        btn.textContent = "SENDING...";
+        const data = {
+            name: name, email: document.getElementById('email').value,
+            L1: document.getElementById('L1').value || "A", L2: document.getElementById('L2').value || "B",
+            Q1_reason: document.getElementById('Q1_reason').value,
+            Q2: document.getElementById('Q2').value, Q3: document.getElementById('Q3').value,
+            Q4: document.getElementById('Q4').value, Q5: document.getElementById('Q5').value,
+            Q6: document.getElementById('Q6').value, Q7: document.getElementById('Q7_val').value,
+            Q8: document.getElementById('Q8_val').value,
+            font1: document.getElementById('font1_display').textContent,
+            font2: document.getElementById('font2_display').textContent,
+            Q10_reason: document.getElementById('Q10_reason').value
+        };
+        fetch(scriptURL + "?" + new URLSearchParams(data).toString(), { method: 'POST' })
+            .then(res => { alert("回覆已珍藏。感謝您共同創作。"); btn.textContent = "SUCCESS"; })
+            .catch(err => { alert("連線失敗"); btn.disabled = false; btn.textContent = "COMMIT RESPONSE"; });
+    }
+    updateLabels();
+</script>
+</body>
+</html>
