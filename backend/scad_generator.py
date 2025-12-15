@@ -22,9 +22,9 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
     bail_tube = 0.7
     
     # 墜頭位置（修正映射）
-    pos_x = pendant_x
-    pos_y = pendant_z  # 前端 bailZ → 後端 Y 軸（深度）
-    pos_z = (size / 2.0) + 2.0 + pendant_y  # 前端 bailY → 後端 Z 軸（高度）
+    pos_x = pendant_x  # X 就是 X
+    pos_y = pendant_y  # Y 就是 Y
+    pos_z = (size / 2.0) + 2.0 + pendant_z
     
     scad_script = f'''// DUET Z-Up System
 $fn = {fn};
