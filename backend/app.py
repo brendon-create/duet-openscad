@@ -47,52 +47,106 @@ def health_check():
         'temp_dir': TEMP_DIR
     })
 
-def validate_font(font_name):
+def get_available_fonts():
     """
-    驗證並標準化字體名稱
-    使用 fc-match 查找系統中的最佳匹配字體
+    獲取系統中所有可用的字體家族名稱
     """
-    logger.info(f"Requesting font: {font_name}")
-    
-    try:
-        # 使用 fc-match 找到最佳匹配的字體
-        result = subprocess.run(
-            ['fc-match', '-f', '%{family}', font_name],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        
-        if result.returncode == 0:
-            matched_font = result.stdout.strip()
-            if matched_font:
-                logger.info(f"Font '{font_name}' matched to '{matched_font}'")
-                return matched_font
-        
-        # 如果 fc-match 失敗，返回原字體名稱
-        logger.warning(f"Could not match font '{font_name}', using as-is")
-        return font_name
-        
-    except Exception as e:
-        logger.error(f"Error matching font '{font_name}': {e}")
-        return font_name
-
-@app.route('/list-fonts', methods=['GET'])
-def list_fonts():
-    """列出系統中所有可用的字體（除錯用）"""
     try:
         result = subprocess.run(
-            ['fc-list', ':family'],
+            ['fc-list', ':', 'family'],
             capture_output=True,
             text=True,
             timeout=10
         )
-        fonts = sorted(set(result.stdout.strip().split('\n')))
-        return jsonify({
-            'total': len(fonts),
-            'fonts': fonts
-        })
+        
+        if result.returncode != 0:
+            return set()
+        
+        font_families = set()
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split(':')
+                if len(parts) >= 2:
+                    families = parts[1].strip()
+                    for family in families.split(','):
+                        clean_name = family.split(':')[0].strip()
+                        if clean_name:
+                            font_families.add(clean_name)
+        
+        return font_families
+        
     except Exception as e:
+        logger.error(f"Error getting available fonts: {e}")
+        return set()
+
+def validate_font(font_name):
+    """
+    嚴格驗證字體是否存在
+    如果字體不存在，拋出錯誤
+    """
+    logger.info(f"Validating font: {font_name}")
+    
+    # 獲取可用字體清單
+    available_fonts = get_available_fonts()
+    
+    if not available_fonts:
+        logger.error("Could not retrieve font list from system")
+        raise ValueError("無法獲取系統字體清單")
+    
+    # 嚴格檢查字體是否存在
+    if font_name not in available_fonts:
+        logger.error(f"Font '{font_name}' not found in system. Available fonts: {len(available_fonts)}")
+        raise ValueError(f"字體 '{font_name}' 不存在。請從字體選單中選擇可用的字體。")
+    
+    logger.info(f"Font '{font_name}' validated successfully")
+    return font_name
+
+@app.route('/list-fonts', methods=['GET'])
+def list_fonts():
+    """
+    列出系統中所有可用的字體家族名稱（用於前端過濾）
+    返回格式：{"fonts": ["Roboto", "Chewy", ...]}
+    """
+    try:
+        # 使用 fc-list 列出所有字體家族
+        result = subprocess.run(
+            ['fc-list', ':', 'family'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            return jsonify({'error': 'Failed to list fonts'}), 500
+        
+        # 解析字體名稱
+        font_families = set()
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                # 格式：/path/to/font.ttf: Family Name:style=Style
+                # 或：/path/to/font.ttf: Family Name,Alternative Name:style=Style
+                parts = line.split(':')
+                if len(parts) >= 2:
+                    # 取第二部分（字體家族）
+                    families = parts[1].strip()
+                    # 處理多個家族名稱（逗號分隔）
+                    for family in families.split(','):
+                        # 移除 style 資訊
+                        clean_name = family.split(':')[0].strip()
+                        if clean_name:
+                            font_families.add(clean_name)
+        
+        # 排序並返回
+        sorted_fonts = sorted(font_families)
+        logger.info(f"Found {len(sorted_fonts)} unique font families")
+        
+        return jsonify({
+            'fonts': sorted_fonts,
+            'total': len(sorted_fonts)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing fonts: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate', methods=['POST'])

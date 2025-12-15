@@ -1,40 +1,14 @@
-def normalize_font_name(font_name):
-    """
-    標準化字體名稱，確保 OpenSCAD 能正確識別
-    
-    處理常見情況：
-    1. "Font Name" → "Font Name:style=Regular"
-    2. 移除多餘空格
-    3. 處理特殊字元
-    """
-    if not font_name:
-        return "Liberation Sans"
-    
-    # 如果已經包含 :style=，直接返回
-    if ":style=" in font_name:
-        return font_name
-    
-    # 標準化空格
-    font_name = " ".join(font_name.split())
-    
-    # 常見的字體需要加 :style=Regular
-    # OpenSCAD 在查找字體時，如果沒有指定 style，可能找不到
-    return font_name
-    
 def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
     """
     生成與前端 Z-Up 系統完全一致的 OpenSCAD 腳本
     
-    關鍵修正（基於 Gemini 建議）：
-    1. Letter 2 使用 rotate([90, 0, 90]) - 單一旋轉，不嵌套
+    關鍵修正：
+    1. Letter 2 旋轉順序匹配前端
     2. 參數映射：pendant_z → Y軸, pendant_y → Z軸
     3. 使用 resize() 確保精確高度
     4. union() 確保無破面
+    5. 字體名稱由後端嚴格驗證，直接使用
     """
-    
-    # 標準化字體名稱
-    font1 = normalize_font_name(font1)
-    font2 = normalize_font_name(font2)
     
     if size <= 20:
         fn = 64

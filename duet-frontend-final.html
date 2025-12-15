@@ -909,8 +909,13 @@
         }
 
         // 頁面載入時自動測試
-        window.addEventListener('load', () => {
-            console.log('📱 頁面已載入，測試後端連接...');
+        window.addEventListener('load', async () => {
+            console.log('📱 頁面已載入，初始化...');
+            
+            // 先初始化可用字體清單
+            await initAvailableFonts();
+            
+            // 然後測試後端連接
             testBackendConnection();
         });
 
@@ -930,7 +935,11 @@
         let modelCenter = new THREE.Vector3();
 
         // 120 種字體清單（來自 font-selector.htm）
-        const fonts = [
+        // 可用字體清單（將由後端動態載入）
+        let availableFonts = [];
+        
+        // 完整字體清單（前端定義）
+        const allFonts = [
             // 1. 經典/高對比襯線體 (Serif - Classic/Display)
             "Playfair Display", "Cinzel", "Bodoni Moda", "Libre Baskerville", "Cormorant Garamond", 
             "EB Garamond", "Taviraj", "Yeseva One", "Caudex", "Prata",
@@ -965,6 +974,41 @@
             "Zen Dots", "Unica One", "Seymour One", "Ruslan Display", "Cabin", 
             "Nosifier", "Vibes", "Croissant One", "Emilys Candy", "Sarala" 
         ];
+        
+        // 初始化可用字體清單
+        async function initAvailableFonts() {
+            try {
+                console.log('🔍 正在獲取後端可用字體...');
+                const response = await fetch(`${BACKEND_URL}/list-fonts`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const backendFonts = data.fonts || [];
+                
+                console.log(`✅ 後端共有 ${backendFonts.length} 種字體`);
+                
+                // 過濾：只保留後端也有的字體
+                availableFonts = allFonts.filter(font => backendFonts.includes(font));
+                
+                console.log(`✅ 前後端共通字體: ${availableFonts.length} 種`);
+                console.log(`⚠️ 不可用字體: ${allFonts.length - availableFonts.length} 種`);
+                
+                if (availableFonts.length === 0) {
+                    console.error('❌ 沒有可用字體！');
+                    availableFonts = ['Roboto']; // 緊急備用
+                }
+                
+            } catch (error) {
+                console.error('❌ 無法獲取字體清單:', error);
+                // 如果失敗，使用全部字體（保持原有行為）
+                availableFonts = allFonts;
+            }
+        }
+
+        const fonts = allFonts; // 保持向後兼容（稍後會移除）
 
         // 材質設定
         const MATERIALS = {
@@ -1078,10 +1122,6 @@
             const evaluator = new Evaluator();
             const baseMat = new THREE.MeshStandardMaterial();
             
-            // === 定義全域軸向量（用於旋轉）===
-            const xAxis = new THREE.Vector3(1, 0, 0);
-            const zAxis = new THREE.Vector3(0, 0, 1);
-            
             const depth = targetHeight * 5.0;
             const params = {
                 font: null,
@@ -1105,7 +1145,10 @@
             
             // === 使用全域軸旋轉（更清晰、易維護）===
             // Letter 1: XZ 平面，沿 Y 軸 extrude
-            geo1.rotateOnWorldAxis(xAxis, Math.PI / 2);
+            // Geometry 沒有 rotateOnWorldAxis，需要用旋轉矩陣
+            const rotationMatrix1 = new THREE.Matrix4();
+            rotationMatrix1.makeRotationX(Math.PI / 2);
+            geo1.applyMatrix4(rotationMatrix1);
             
             const brush1 = new Brush(geo1, baseMat);
             brush1.updateMatrixWorld();
@@ -1121,8 +1164,13 @@
             
             // === 使用全域軸旋轉（更清晰、易維護）===
             // Letter 2: 先繞 X 軸轉 90 度，再繞 Z 軸轉 90 度
-            geo2.rotateOnWorldAxis(xAxis, Math.PI / 2);  // 第一步：XY → XZ
-            geo2.rotateOnWorldAxis(zAxis, Math.PI / 2);  // 第二步：XZ → YZ
+            const rotationMatrix2X = new THREE.Matrix4();
+            rotationMatrix2X.makeRotationX(Math.PI / 2);
+            geo2.applyMatrix4(rotationMatrix2X);
+            
+            const rotationMatrix2Z = new THREE.Matrix4();
+            rotationMatrix2Z.makeRotationZ(Math.PI / 2);
+            geo2.applyMatrix4(rotationMatrix2Z);
             
             const brush2 = new Brush(geo2, baseMat);
             brush2.updateMatrixWorld();
@@ -1444,7 +1492,10 @@
             const listContainer = document.getElementById('font-list-container');
             const displayArea = document.getElementById('font-display-area');
 
-            fonts.forEach((font) => {
+            // 使用經過後端驗證的字體清單
+            const fontsToDisplay = availableFonts.length > 0 ? availableFonts : allFonts;
+            
+            fontsToDisplay.forEach((font) => {
                 const item = document.createElement('div');
                 item.className = 'font-list-item';
                 
