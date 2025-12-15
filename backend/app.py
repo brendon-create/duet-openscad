@@ -49,18 +49,33 @@ def health_check():
 
 def validate_font(font_name):
     """
-    驗證字體是否已安裝
-    
-    注意：Dockerfile 已安裝所有 110 種 Google Fonts，
-    因此不需要嚴格驗證，讓 OpenSCAD 自行處理字體。
-    如果字體不存在，OpenSCAD 會使用系統預設字體。
+    驗證並標準化字體名稱
+    使用 fc-match 查找系統中的最佳匹配字體
     """
-    # 記錄使用的字體（用於除錯）
     logger.info(f"Requesting font: {font_name}")
     
-    # 不進行嚴格驗證，允許所有字體
-    # 如果字體真的不存在，OpenSCAD 會在運行時報錯或使用替代字體
-    return True
+    try:
+        # 使用 fc-match 找到最佳匹配的字體
+        result = subprocess.run(
+            ['fc-match', '-f', '%{family}', font_name],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0:
+            matched_font = result.stdout.strip()
+            if matched_font:
+                logger.info(f"Font '{font_name}' matched to '{matched_font}'")
+                return matched_font
+        
+        # 如果 fc-match 失敗，返回原字體名稱
+        logger.warning(f"Could not match font '{font_name}', using as-is")
+        return font_name
+        
+    except Exception as e:
+        logger.error(f"Error matching font '{font_name}': {e}")
+        return font_name
 
 @app.route('/list-fonts', methods=['GET'])
 def list_fonts():
@@ -111,9 +126,9 @@ def generate_stl():
         
         logger.info(f"Pendant params: x={pendant_x}, y={pendant_y}, z={pendant_z}, rotation={pendant_rotation}")
         
-        # 🔒 驗證字體
-        validate_font(font1)
-        validate_font(font2)
+        # 驗證並標準化字體名稱
+        font1 = validate_font(font1)
+        font2 = validate_font(font2)
         
         # 生成 OpenSCAD 腳本
         scad_content = generate_scad_script(
