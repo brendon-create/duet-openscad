@@ -82,4 +82,9 @@ union() {{
     bail();
 }}
 '''
+    # Debug: 輸出生成的 SCAD 內容（前 50 行）
+    logger.info("📄 Generated SCAD content (first 50 lines):")
+    lines = scad_script.split('\n')
+    for i, line in enumerate(lines[:50], 1):
+        logger.info(f"  {i:3}: {line}")
     return scad_script
