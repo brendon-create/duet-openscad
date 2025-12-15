@@ -53,7 +53,7 @@ def get_available_fonts():
     """
     try:
         result = subprocess.run(
-            ['fc-list', ':', 'family'],
+            ['fc-list', ':family'],
             capture_output=True,
             text=True,
             timeout=10
@@ -65,13 +65,10 @@ def get_available_fonts():
         font_families = set()
         for line in result.stdout.strip().split('\n'):
             if line:
-                parts = line.split(':')
-                if len(parts) >= 2:
-                    families = parts[1].strip()
-                    for family in families.split(','):
-                        clean_name = family.split(':')[0].strip()
-                        if clean_name:
-                            font_families.add(clean_name)
+                for family in line.split(','):
+                    clean_name = family.strip()
+                    if clean_name:
+                        font_families.add(clean_name)
         
         return font_families
         
@@ -110,31 +107,29 @@ def list_fonts():
     try:
         # 使用 fc-list 列出所有字體家族
         result = subprocess.run(
-            ['fc-list', ':', 'family'],
+            ['fc-list', ':family'],
             capture_output=True,
             text=True,
             timeout=10
         )
         
         if result.returncode != 0:
+            logger.error(f"fc-list failed: {result.stderr}")
             return jsonify({'error': 'Failed to list fonts'}), 500
         
         # 解析字體名稱
+        # fc-list :family 的輸出格式：
+        # Family Name
+        # Family Name,Alternative Name
+        # 每行一個字體家族
         font_families = set()
         for line in result.stdout.strip().split('\n'):
             if line:
-                # 格式：/path/to/font.ttf: Family Name:style=Style
-                # 或：/path/to/font.ttf: Family Name,Alternative Name:style=Style
-                parts = line.split(':')
-                if len(parts) >= 2:
-                    # 取第二部分（字體家族）
-                    families = parts[1].strip()
-                    # 處理多個家族名稱（逗號分隔）
-                    for family in families.split(','):
-                        # 移除 style 資訊
-                        clean_name = family.split(':')[0].strip()
-                        if clean_name:
-                            font_families.add(clean_name)
+                # 處理多個家族名稱（逗號分隔）
+                for family in line.split(','):
+                    clean_name = family.strip()
+                    if clean_name:
+                        font_families.add(clean_name)
         
         # 排序並返回
         sorted_fonts = sorted(font_families)
