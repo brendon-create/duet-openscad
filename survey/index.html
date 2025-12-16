@@ -16,13 +16,12 @@
             background-attachment: fixed;
             background-color: var(--bg); 
             color: #fff; line-height: 1.7; padding: 20px; margin: 0; 
-            /* 調整為較小的內文字體 */
             font-size: 18px; 
             font-weight: 300; -webkit-font-smoothing: antialiased;
         }
         
         .container { 
-            max-width: 800px; /* 寬度進一步減少 */
+            max-width: 800px; 
             margin: 40px auto; 
             background: rgba(10, 14, 20, 0.75); 
             padding: 55px 75px; border-radius: 24px; 
@@ -31,16 +30,12 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
         }
         
-        /* 縮小標題字體 */
         h1 { color: var(--gold); text-align: center; margin-bottom: 25px; letter-spacing: 4px; font-weight: 300; font-size: 32px; }
-        /* 縮小引言字體 */
         .concept-note { text-align: center; color: #aaa; font-size: 18px; margin-bottom: 50px; padding: 0 20px; }
         .question-group { margin-bottom: 75px; padding-bottom: 55px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         
-        /* 標籤字體再小 1px (22 -> 21) */
         label { display: block; font-size: 21px; margin-bottom: 18px; color: var(--gold); font-weight: 400; }
         
-        /* 縮小輸入框字體 */
         input[type="text"], input[type="email"], textarea, select {
             width: 100%; padding: 18px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
             border-radius: 12px; color: #fff; font-size: 18px; transition: 0.3s; box-sizing: border-box; font-family: inherit;
@@ -51,7 +46,6 @@
         .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 15px; overflow: hidden; transition: 0.4s; background: #1a1a1a; transform: scale(1.05); }
         .img-card img { width: 100%; height: 350px; object-fit: cover; display: block; filter: grayscale(10%); }
         #mag-options .img-card img { height: 480px; object-fit: contain; background: #000; }
-        /* 縮小圖片描述字體 */
         .img-card p { font-size: 16px; text-align: center; padding: 15px; background: rgba(0,0,0,0.85); margin: 0; }
         .img-card.selected { border-color: var(--gold); box-shadow: 0 0 35px rgba(212, 175, 55, 0.6); }
 
@@ -60,7 +54,6 @@
             width: 100%; max-width: 850px; margin: 40px auto; 
         }
         .font-selection-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
-        /* 縮小字體選擇按鈕字體 */
         .font-trigger { 
             width: 280px; padding: 16px; background: rgba(255,255,255,0.1); border: 2px solid var(--gold); 
             border-radius: 12px; color: var(--gold); font-size: 18px; cursor: pointer; transition: 0.3s; text-align: center;
@@ -71,14 +64,14 @@
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);
         }
+        /* 縮小成功彈窗面板 */
         .glass-panel {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 40px;
-            padding: 65px; text-align: center; max-width: 520px;
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 30px;
+            padding: 45px; text-align: center; max-width: 400px;
             box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.1);
         }
 
-        /* 縮小按鈕字體 */
         .submit-btn { width: 100%; padding: 24px; background: var(--gold); color: #000; border: none; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 20px; margin-top: 35px; letter-spacing: 2px; }
         
         #font-selector-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; padding: 40px; box-sizing: border-box; }
@@ -181,7 +174,13 @@
     <button id="submitBtn" class="submit-btn" onclick="submitForm()">確認提交回覆</button>
 </div>
 
-<div id="success-modal"><div class="glass-panel"><h2 style="color:var(--gold); font-size:36px; margin-bottom:20px;">提交成功</h2><p style="font-size:20px; color:#fff; margin-bottom:35px;">感謝您為 DUET 注入靈魂。<br>您的訪談回覆已送達。</p><button onclick="location.reload()" style="background:var(--gold); border:none; padding:15px 55px; border-radius:35px; font-weight:600; font-size:18px; cursor:pointer;">返回首頁</button></div></div>
+<div id="success-modal">
+    <div class="glass-panel">
+        <h2 style="color:var(--gold); font-size:28px; margin-bottom:15px;">提交成功</h2>
+        <p style="font-size:17px; color:#fff; margin-bottom:30px; line-height:1.6;">感謝您為 DUET 注入靈魂。<br>您的訪談回覆已送達。</p>
+        <button onclick="location.reload()" style="background:var(--gold); border:none; padding:12px 40px; border-radius:30px; font-weight:600; font-size:16px; cursor:pointer;">返回首頁</button>
+    </div>
+</div>
 
 <div id="font-selector-modal">
     <div style="max-width:1200px; margin:0 auto; height:100%; display:flex; flex-direction:column;">
