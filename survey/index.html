@@ -15,46 +15,55 @@
             background-position: center;
             background-attachment: fixed;
             background-color: var(--bg); 
-            color: #fff; line-height: 1.8; padding: 20px; margin: 0; 
-            zoom: 0.5; -moz-transform: scale(0.7); -moz-transform-origin: top center; 
-            font-size: 20px; font-weight: 300; -webkit-font-smoothing: antialiased;
+            color: #fff; line-height: 1.7; padding: 20px; margin: 0; 
+            /* 調整為較小的內文字體 */
+            font-size: 18px; 
+            font-weight: 300; -webkit-font-smoothing: antialiased;
         }
         
         .container { 
-            max-width: 1200px; margin: 40px auto; 
-            background: rgba(10, 14, 20, 0.65); 
-            padding: 50px 70px; border-radius: 24px; 
+            max-width: 800px; /* 寬度進一步減少 */
+            margin: 40px auto; 
+            background: rgba(10, 14, 20, 0.75); 
+            padding: 55px 75px; border-radius: 24px; 
             backdrop-filter: blur(20px); 
             border: 1px solid rgba(255,255,255,0.1); 
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
         }
         
-        h1 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 4px; font-weight: 300; }
-        .concept-note { text-align: center; color: #aaa; font-size: 20px; margin-bottom: 40px; padding: 0 20px; }
-        .question-group { margin-bottom: 70px; padding-bottom: 50px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        label { display: block; font-size: 26px; margin-bottom: 15px; color: var(--gold); font-weight: 400; }
+        /* 縮小標題字體 */
+        h1 { color: var(--gold); text-align: center; margin-bottom: 25px; letter-spacing: 4px; font-weight: 300; font-size: 32px; }
+        /* 縮小引言字體 */
+        .concept-note { text-align: center; color: #aaa; font-size: 18px; margin-bottom: 50px; padding: 0 20px; }
+        .question-group { margin-bottom: 75px; padding-bottom: 55px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         
+        /* 標籤字體再小 1px (22 -> 21) */
+        label { display: block; font-size: 21px; margin-bottom: 18px; color: var(--gold); font-weight: 400; }
+        
+        /* 縮小輸入框字體 */
         input[type="text"], input[type="email"], textarea, select {
             width: 100%; padding: 18px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 10px; color: #fff; font-size: 24px; transition: 0.3s; box-sizing: border-box; font-family: inherit;
+            border-radius: 12px; color: #fff; font-size: 18px; transition: 0.3s; box-sizing: border-box; font-family: inherit;
         }
         input:focus, textarea:focus { outline: none; border-color: var(--gold); background: rgba(255,255,255,0.12); }
 
-        .image-options { display: grid; grid-template-columns: 1fr 1fr; gap: 100px 80px; margin-top: 80px; padding: 20px; }
-        .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 15px; overflow: hidden; transition: 0.4s; background: #1a1a1a; transform: scale(1.1); }
-        .img-card img { width: 100%; height: 320px; object-fit: cover; display: block; filter: grayscale(10%); }
-        #mag-options .img-card img { height: 450px; object-fit: contain; background: #000; }
-        .img-card p { font-size: 18px; text-align: center; padding: 15px; background: rgba(0,0,0,0.85); margin: 0; }
-        .img-card.selected { border-color: var(--gold); box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); }
+        .image-options { display: grid; grid-template-columns: 1fr 1fr; gap: 100px 80px; margin-top: 70px; padding: 20px; }
+        .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 15px; overflow: hidden; transition: 0.4s; background: #1a1a1a; transform: scale(1.05); }
+        .img-card img { width: 100%; height: 350px; object-fit: cover; display: block; filter: grayscale(10%); }
+        #mag-options .img-card img { height: 480px; object-fit: contain; background: #000; }
+        /* 縮小圖片描述字體 */
+        .img-card p { font-size: 16px; text-align: center; padding: 15px; background: rgba(0,0,0,0.85); margin: 0; }
+        .img-card.selected { border-color: var(--gold); box-shadow: 0 0 35px rgba(212, 175, 55, 0.6); }
 
         .font-selection-wrapper { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 60px; 
-            width: 100%; max-width: 800px; margin: 40px auto; 
+            width: 100%; max-width: 850px; margin: 40px auto; 
         }
         .font-selection-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        /* 縮小字體選擇按鈕字體 */
         .font-trigger { 
-            width: 260px; padding: 16px; background: rgba(255,255,255,0.1); border: 1px solid var(--gold); 
-            border-radius: 10px; color: var(--gold); font-size: 20px; cursor: pointer; transition: 0.3s; text-align: center;
+            width: 280px; padding: 16px; background: rgba(255,255,255,0.1); border: 2px solid var(--gold); 
+            border-radius: 12px; color: var(--gold); font-size: 18px; cursor: pointer; transition: 0.3s; text-align: center;
         }
         .font-trigger:hover { background: rgba(212, 175, 55, 0.15); }
 
@@ -64,25 +73,24 @@
         }
         .glass-panel {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 35px;
-            padding: 60px; text-align: center; max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 40px;
+            padding: 65px; text-align: center; max-width: 520px;
             box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.1);
-            animation: panelFade 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        @keyframes panelFade { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 24px; margin-top: 30px; letter-spacing: 2px; }
+        /* 縮小按鈕字體 */
+        .submit-btn { width: 100%; padding: 24px; background: var(--gold); color: #000; border: none; border-radius: 15px; font-weight: 600; cursor: pointer; font-size: 20px; margin-top: 35px; letter-spacing: 2px; }
         
         #font-selector-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; padding: 40px; box-sizing: border-box; }
         
         .font-grid { 
             display: grid; 
-            grid-template-columns: repeat(5, 1fr); 
+            grid-template-columns: repeat(4, 1fr); 
             gap: 20px; 
             overflow-y: auto; 
             height: 75vh; 
         }
-        .font-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; cursor: pointer; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
+        .font-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; cursor: pointer; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
     </style>
 </head>
 <body>
@@ -91,16 +99,16 @@
     <h1>DUET 創作者深度訪談</h1>
     <p class="concept-note">「美好的關係，是兩個人各自保有自我，並在交集中找到和諧與共鳴。」</p>
     
-    <div class="question-group" style="display: flex; gap: 20px;">
+    <div class="question-group" style="display: flex; gap: 25px;">
         <div style="flex:1;"><label>您的姓名</label><input type="text" id="name" placeholder="請輸入姓名"></div>
         <div style="flex:1;"><label>您的 E-mail</label><input type="email" id="email" placeholder="example@gmail.com"></div>
     </div>
 
     <div class="question-group">
         <label>1. 如果您要訂製一個飾品，而這件飾品上可以包含兩個字母，您會選哪兩個字母？</label>
-        <div style="display:flex; gap:15px;">
-            <input type="text" id="L1" maxlength="1" placeholder="A" style="width:100px; text-align:center;" oninput="updateDynamicLabels()">
-            <input type="text" id="L2" maxlength="1" placeholder="B" style="width:100px; text-align:center;" oninput="updateDynamicLabels()">
+        <div style="display:flex; gap:18px;">
+            <input type="text" id="L1" maxlength="1" placeholder="A" style="width:110px; text-align:center;" oninput="updateDynamicLabels()">
+            <input type="text" id="L2" maxlength="1" placeholder="B" style="width:110px; text-align:center;" oninput="updateDynamicLabels()">
         </div>
     </div>
 
@@ -127,7 +135,7 @@
             <option value="搖滾">搖滾</option>
             <option value="其他">其他</option>
         </select>
-        <input type="text" id="Q6_other" style="display:none; margin-top:15px;" placeholder="請描述您心中的音樂風格...">
+        <input type="text" id="Q6_other" style="display:none; margin-top:18px;" placeholder="請描述您心中的音樂風格...">
     </div>
 
     <div class="question-group">
@@ -153,15 +161,15 @@
         <input type="hidden" id="Q8_val">
     </div>
 
-    <div class="question-group" style="background: rgba(212, 175, 55, 0.05); padding: 40px; border-radius: 20px; border: 1px dashed rgba(212, 175, 55, 0.3);">
-        <label style="text-align: center; margin-bottom: 30px;">14. 選擇字體風格</label>
+    <div class="question-group" style="background: rgba(212, 175, 55, 0.05); padding: 40px; border-radius: 25px; border: 1px dashed rgba(212, 175, 55, 0.3);">
+        <label style="text-align: center; margin-bottom: 30px; font-size: 21px;">14. 選擇字體風格</label>
         <div class="font-selection-wrapper">
             <div class="font-selection-item">
-                <label id="btn_label_L1" style="font-size: 20px;">字母 ？ 字體</label>
+                <label id="btn_label_L1" style="font-size: 18px;">字母 ？ 字體</label>
                 <div id="font1_display" class="font-trigger" onclick="openFontSelector(1)">點擊挑選</div>
             </div>
             <div class="font-selection-item">
-                <label id="btn_label_L2" style="font-size: 20px;">字母 ？ 字體</label>
+                <label id="btn_label_L2" style="font-size: 18px;">字母 ？ 字體</label>
                 <div id="font2_display" class="font-trigger" onclick="openFontSelector(2)">點擊挑選</div>
             </div>
         </div>
@@ -173,15 +181,22 @@
     <button id="submitBtn" class="submit-btn" onclick="submitForm()">確認提交回覆</button>
 </div>
 
-<div id="success-modal"><div class="glass-panel"><h2 style="color:var(--gold); font-size:38px; margin-bottom:20px;">提交成功</h2><p style="font-size:22px; color:#fff; margin-bottom:35px;">感謝您為 DUET 注入靈魂。<br>您的訪談回覆已送達。</p><button onclick="location.reload()" style="background:var(--gold); border:none; padding:15px 50px; border-radius:30px; font-weight:600; cursor:pointer;">返回首頁</button></div></div>
+<div id="success-modal"><div class="glass-panel"><h2 style="color:var(--gold); font-size:36px; margin-bottom:20px;">提交成功</h2><p style="font-size:20px; color:#fff; margin-bottom:35px;">感謝您為 DUET 注入靈魂。<br>您的訪談回覆已送達。</p><button onclick="location.reload()" style="background:var(--gold); border:none; padding:15px 55px; border-radius:35px; font-weight:600; font-size:18px; cursor:pointer;">返回首頁</button></div></div>
 
-<div id="font-selector-modal"><div style="max-width:1200px; margin:0 auto; height:100%; display:flex; flex-direction:column;"><h2 style="color:var(--gold); padding:20px;">挑選字體風格</h2><div class="font-grid" id="font-list-container"></div><button onclick="closeFontSelector()" style="width:100%; padding:15px; background:#333; color:#fff; border:none; margin-top:20px; cursor:pointer;">關閉</button></div></div>
+<div id="font-selector-modal">
+    <div style="max-width:1200px; margin:0 auto; height:100%; display:flex; flex-direction:column;">
+        <h2 style="color:var(--gold); padding:20px; font-size:28px;">挑選字體風格</h2>
+        <div class="font-grid" id="font-list-container"></div>
+        <button onclick="closeFontSelector()" style="width:100%; padding:18px; background:#333; color:#fff; border:none; margin-top:20px; cursor:pointer; font-size:18px;">關閉</button>
+    </div>
+</div>
 
 <script>
     const allFonts = ["Abel", "Abril Fatface", "Advent Pro", "Alegreya", "Alex Brush", "Alfa Slab One", "Alice", "Allura", "Amatic SC", "Amiri", "Anton", "Arapey", "Archivo", "Armata", "Artifika", "Arvo", "Audiowide", "Average", "Baloo 2", "Bangers", "Bebas Neue", "Belgrano", "Bentham", "Bitter", "Bree Serif", "Bubblegum Sans", "Bungee", "Cabin", "Cantata One", "Caudex", "Caveat", "Chivo", "Cinzel", "Comfortaa", "Commissioner", "Cookie", "Copse", "Cormorant Garamond", "Courier Prime", "Coustard", "Creepster", "Cutive Mono", "DM Serif Text", "Dancing Script", "Dosis", "EB Garamond", "Eczar", "Encode Sans", "Fauna One", "Fira Code", "Fira Sans", "Fjalla One", "Fugaz One", "Gelasio", "Gloria Hallelujah", "Great Vibes", "Handlee", "Hind", "Holtwood One SC", "Inconsolata", "Indie Flower", "Jost", "Kalam", "Kanit", "Karla", "Lexend", "Lobster", "Merriweather", "Neuton", "Nunito", "Old Standard TT", "Orbitron", "Oswald", "Outfit", "Pacifico", "Passion One", "Pathway Gothic One", "Patrick Hand", "Paytone One", "Playfair Display", "Poppins", "Prata", "Quicksand", "Righteous", "Rubik", "Russo One", "Sacramento", "Secular One", "Shadows Into Light", "Share Tech Mono", "Shrikhand", "Sniglet", "Space Grotesk", "Space Mono", "Spectral", "Tangerine", "Titan One", "Varela Round", "Vollkorn", "Zilla Slab"];
     
     const scriptURL = "https://script.google.com/macros/s/AKfycbwqPAlaIjQR3G4xn6ZMe4gx_DAyJeMVBrQIZzpoUQYwtAy7oQhlrt_ZVCkoShExXV6K7w/exec";
     let activeSlot = 1;
+    let savedScrollPosition = 0;
 
     function toggleMusicOther() {
         const s = document.getElementById('Q6');
@@ -202,13 +217,13 @@
     }
 
     function openFontSelector(slot) {
+        savedScrollPosition = window.pageYOffset || document.documentElement.scrollTop;
         activeSlot = slot;
         const targetChar = (slot === 1) ? (document.getElementById('L1').value || "A") : (document.getElementById('L2').value || "B");
         const container = document.getElementById('font-list-container');
         container.innerHTML = '';
         
         allFonts.forEach(font => {
-            // 【優化載入】：檢查是否已經載入過該字體，避免 head 堆積
             const fontId = `font-link-${font.replace(/\s+/g, '-')}`;
             if (!document.getElementById(fontId)) {
                 const link = document.createElement('link');
@@ -221,8 +236,9 @@
             const card = document.createElement('div');
             card.className = 'font-card';
             card.style.fontFamily = `"${font}", sans-serif`;
-            card.innerHTML = `<div style="font-size:36px; margin-bottom:5px;">${targetChar}</div><div style="font-size:14px;">${font}</div>`;
-            card.onclick = () => {
+            card.innerHTML = `<div style="font-size:32px; margin-bottom:8px;">${targetChar}</div><div style="font-size:14px;">${font}</div>`;
+            card.onclick = (e) => {
+                e.preventDefault();
                 const d = document.getElementById(`font${activeSlot}_display`);
                 d.textContent = font; 
                 d.style.fontFamily = `"${font}", sans-serif`;
@@ -234,7 +250,10 @@
         document.getElementById('font-selector-modal').style.display = 'block';
     }
 
-    function closeFontSelector() { document.getElementById('font-selector-modal').style.display = 'none'; }
+    function closeFontSelector() { 
+        document.getElementById('font-selector-modal').style.display = 'none';
+        window.scrollTo(0, savedScrollPosition);
+    }
     
     function selectImg(type, val, el) {
         document.querySelectorAll(`#${type}-options .img-card`).forEach(c => c.classList.remove('selected'));
