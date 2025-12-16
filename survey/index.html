@@ -282,37 +282,61 @@
     }
 
     function submitForm() {
-        const btn = document.getElementById('submitBtn');
-        const name = document.getElementById('name').value;
-        if(!name) { alert("請填寫您的姓名"); return; }
-        
-        btn.disabled = true; btn.textContent = "發送中...";
-        const data = {
-            name: name,
-            email: document.getElementById('email').value,
-            L1: document.getElementById('L1').value,
-            L2: document.getElementById('L2').value,
-            Q1_reason: document.getElementById('Q1_reason').value,
-            Q1_2_reason: document.getElementById('Q1_2_reason').value,
-            Q2: document.getElementById('Q2').value,
-            Q2_5: document.getElementById('Q2_5').value,
-            Q3: document.getElementById('Q3').value,
-            Q3_5: document.getElementById('Q3_5').value,
-            Q4: document.getElementById('Q4').value,
-            Q5: document.getElementById('Q5').value,
-            Q5_5: document.getElementById('Q5_5').value,
-            Q6: document.getElementById('Q6').value,
-            Q7: document.getElementById('Q7_val').value,
-            Q8: document.getElementById('Q8_val').value,
-            font1: document.getElementById('font1_display').textContent,
-            font2: document.getElementById('font2_display').textContent,
-            font1_r: document.getElementById('font1_r').value,
-            font2_r: document.getElementById('font2_r').value
-        };
-        fetch(scriptURL + "?" + new URLSearchParams(data).toString(), { method: 'POST' })
-            .then(() => { alert("提交成功！謝謝你為DUET注入靈魂～"); btn.textContent = "已完成"; })
-            .catch(() => { alert("提交失敗。"); btn.disabled = false; btn.textContent = "確認提交回覆"; });
+    const btn = document.getElementById('submitBtn');
+    const name = document.getElementById('name').value;
+    if (!name) { alert("請填寫您的姓名"); return; }
+
+    // 處理曲風選項
+    let genreValue = document.getElementById('Q6').value;
+    if (genreValue === '其他') {
+        genreValue = document.getElementById('Q6_other').value || "其他（未填寫）";
     }
+
+    btn.disabled = true;
+    btn.textContent = "發送中...";
+
+    // --- 這裡就是關鍵的 20 個欄位，必須與後端 Code.gs 對齊 ---
+    const data = {
+        name: name,                             // 1. 姓名
+        email: document.getElementById('email').value, // 2. Email
+        L1: document.getElementById('L1').value || "A", // 3. 字母1
+        L2: document.getElementById('L2').value || "B", // 4. 字母2
+        Q1_reason: document.getElementById('Q1_reason').value, // 5. 字母1意義
+        Q1_2_reason: document.getElementById('Q1_2_reason').value, // 6. 字母2意義 (之前漏掉)
+        Q2: document.getElementById('Q2').value, // 7. 共通點
+        Q2_5: document.getElementById('Q2_5').value, // 8. 共同回憶 (之前漏掉)
+        Q3: document.getElementById('Q3').value, // 9. 帶來不同
+        Q3_5: document.getElementById('Q3_5').value, // 10. 傳達訊息 (之前漏掉)
+        Q4: document.getElementById('Q4').value, // 11. 形容詞
+        Q5: document.getElementById('Q5').value, // 12. 為什麼重要
+        Q5_5: document.getElementById('Q5_5').value, // 13. 欣賞點 (之前漏掉)
+        Q6: genreValue,                         // 14. 音樂曲風
+        Q7: document.getElementById('Q7_val').value, // 15. 空間氛圍
+        Q8: document.getElementById('Q8_val').value, // 16. 雜誌排版
+        font1: document.getElementById('font1_display').textContent, // 17. 字體1
+        font2: document.getElementById('font2_display').textContent, // 18. 字體2
+        font1_r: document.getElementById('font1_r').value, // 19. 字體1原因 (原本寫錯成 Q10_reason)
+        font2_r: document.getElementById('font2_r').value  // 20. 字體2原因 (之前漏掉)
+    };
+
+    const params = new URLSearchParams(data).toString();
+
+    // 使用 GET 或 POST 取決於您的 Code.gs，通常問卷建議用 GET + params 或是 POST no-cors
+    fetch(scriptURL + "?" + params, { 
+        method: 'POST',
+        mode: 'no-cors' 
+    })
+    .then(() => {
+        alert("提交成功！感謝您為 DUET 注入靈魂。");
+        btn.textContent = "提交成功";
+    })
+    .catch(err => {
+        console.error(err);
+        alert("提交失敗，請檢查網路。");
+        btn.disabled = false;
+        btn.textContent = "重新提交";
+    });
+}
     updateDynamicLabels();
 </script>
 </body>
