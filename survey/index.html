@@ -80,8 +80,17 @@
         .preview-char { font-size: 48px; margin-bottom: 10px; color: #fff; line-height: 1; }
         
         .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 22px; margin-top: 30px; letter-spacing: 2px; font-family: inherit; }
-        .font-selection-wrapper { display: flex; justify-content: center; gap: 80px; max-width: 500px; margin: 0 auto; }
-        .font-selection-item { flex: 1; }
+        .font-selection-wrapper { display: flex; 
+    justify-content: center; /* 水平置中所有按鈕 */
+    align-items: flex-start; 
+    gap: 40px;               /* 兩個按鈕之間的間隔 */
+    width: 100%;             /* 佔滿寬度，確保 justify-content 生效 */
+    margin: 20px 0;          /* 增加上下間距 */ }
+        .font-selection-item { flex: 0 1 auto;          
+    display: flex;
+    flex-direction: column;
+    align-items: center;     /* 確保 Label 和 按鈕垂直對齊 */
+    text-align: center; }
     </style>
 </head>
 <body>
