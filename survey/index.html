@@ -10,7 +10,13 @@
         
         body { 
             font-family: "Noto Sans TC", "PingFang TC", "STHeitiTC-Light", "Microsoft JhengHei", sans-serif; 
-            background-color: var(--bg); 
+            /* 新增背景圖設定 */
+            background-image: url('https://raw.githubusercontent.com/brendon-create/duet-openscad/main/survey/desk.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-color: var(--bg); /* 作為底色備份 */
+            
             color: #fff; 
             line-height: 1.8; 
             padding: 20px; 
@@ -24,12 +30,12 @@
             -webkit-font-smoothing: antialiased;
         }
         
-        /* 修改點：寬度再次增加至 1200px，給予照片絕對充足的空間 */
+        /* 寬度增加至 1200px，體現透明毛玻璃效果 */
         .container { 
             max-width: 1200px; 
             margin: 40px auto; 
-            background: rgba(255,255,255,0.03); 
-            padding: 50px 70px; /* 增加左右內距 */
+            background: rgba(10, 14, 20, 0.75); /* 稍微加深底色以確保文字清晰，同時保持透明 */
+            padding: 50px 70px; 
             border-radius: 24px; 
             backdrop-filter: blur(20px); 
             border: 1px solid rgba(255,255,255,0.1); 
@@ -55,21 +61,18 @@
             font-family: inherit;
         }
 
-        /* 修改點：大幅增加 gap 以補償 scale(1.3) 佔用的空間 */
         .image-options { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 120px 100px; /* 再次增加左右 (100px) 與上下 (120px) 的距離 */
+            gap: 120px 100px; 
             margin-top: 70px; 
             padding: 30px; 
         }
         
-        /* 圖片卡片保持 1.3 倍放大 */
         .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 12px; overflow: hidden; transition: 0.4s; position: relative; background: #1a1a1a; transform: scale(1.3); }
         .img-card img { width: 100%; height: 160px; object-fit: cover; display: block; filter: grayscale(10%); }
         #mag-options .img-card img { height: 220px; object-fit: contain; background: #000; }
         
-        /* 照片名稱字體加大 2 級 (14px) */
         .img-card p { font-size: 14px; text-align: center; padding: 10px; background: rgba(0,0,0,0.85); margin: 0; color: #fff; letter-spacing: 1px; font-weight: 500; }
         .img-card.selected { border-color: var(--gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.7); }
 
@@ -80,17 +83,8 @@
         .preview-char { font-size: 48px; margin-bottom: 10px; color: #fff; line-height: 1; }
         
         .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 22px; margin-top: 30px; letter-spacing: 2px; font-family: inherit; }
-        .font-selection-wrapper { display: flex; 
-    justify-content: center; /* 水平置中所有按鈕 */
-    align-items: flex-start; 
-    gap: 40px;               /* 兩個按鈕之間的間隔 */
-    width: 100%;             /* 佔滿寬度，確保 justify-content 生效 */
-    margin: 20px 0;          /* 增加上下間距 */ }
-        .font-selection-item { flex: 0 1 auto;          
-    display: flex;
-    flex-direction: column;
-    align-items: center;     /* 確保 Label 和 按鈕垂直對齊 */
-    text-align: center; }
+        .font-selection-wrapper { display: flex; justify-content: center; align-items: flex-start; gap: 40px; width: 100%; margin: 20px 0; }
+        .font-selection-item { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
     </style>
 </head>
 <body>
@@ -286,7 +280,6 @@
     const name = document.getElementById('name').value;
     if (!name) { alert("請填寫您的姓名"); return; }
 
-    // 處理曲風選項
     let genreValue = document.getElementById('Q6').value;
     if (genreValue === '其他') {
         genreValue = document.getElementById('Q6_other').value || "其他（未填寫）";
@@ -295,33 +288,31 @@
     btn.disabled = true;
     btn.textContent = "發送中...";
 
-    // --- 這裡就是關鍵的 20 個欄位，必須與後端 Code.gs 對齊 ---
     const data = {
         name: name,                             // 1. 姓名
         email: document.getElementById('email').value, // 2. Email
         L1: document.getElementById('L1').value || "A", // 3. 字母1
         L2: document.getElementById('L2').value || "B", // 4. 字母2
         Q1_reason: document.getElementById('Q1_reason').value, // 5. 字母1意義
-        Q1_2_reason: document.getElementById('Q1_2_reason').value, // 6. 字母2意義 (之前漏掉)
+        Q1_2_reason: document.getElementById('Q1_2_reason').value, // 6. 字母2意義
         Q2: document.getElementById('Q2').value, // 7. 共通點
-        Q2_5: document.getElementById('Q2_5').value, // 8. 共同回憶 (之前漏掉)
+        Q2_5: document.getElementById('Q2_5').value, // 8. 共同回憶
         Q3: document.getElementById('Q3').value, // 9. 帶來不同
-        Q3_5: document.getElementById('Q3_5').value, // 10. 傳達訊息 (之前漏掉)
+        Q3_5: document.getElementById('Q3_5').value, // 10. 傳達訊息
         Q4: document.getElementById('Q4').value, // 11. 形容詞
         Q5: document.getElementById('Q5').value, // 12. 為什麼重要
-        Q5_5: document.getElementById('Q5_5').value, // 13. 欣賞點 (之前漏掉)
+        Q5_5: document.getElementById('Q5_5').value, // 13. 欣賞點
         Q6: genreValue,                         // 14. 音樂曲風
         Q7: document.getElementById('Q7_val').value, // 15. 空間氛圍
         Q8: document.getElementById('Q8_val').value, // 16. 雜誌排版
         font1: document.getElementById('font1_display').textContent, // 17. 字體1
         font2: document.getElementById('font2_display').textContent, // 18. 字體2
-        font1_r: document.getElementById('font1_r').value, // 19. 字體1原因 (原本寫錯成 Q10_reason)
-        font2_r: document.getElementById('font2_r').value  // 20. 字體2原因 (之前漏掉)
+        font1_r: document.getElementById('font1_r').value, // 19. 字體1原因
+        font2_r: document.getElementById('font2_r').value  // 20. 字體2原因
     };
 
     const params = new URLSearchParams(data).toString();
 
-    // 使用 GET 或 POST 取決於您的 Code.gs，通常問卷建議用 GET + params 或是 POST no-cors
     fetch(scriptURL + "?" + params, { 
         method: 'POST',
         mode: 'no-cors' 
@@ -334,7 +325,7 @@
         console.error(err);
         alert("提交失敗，請檢查網路。");
         btn.disabled = false;
-        btn.textContent = "重新提交";
+        btn.textContent = "重新提交回覆";
     });
 }
     updateDynamicLabels();
