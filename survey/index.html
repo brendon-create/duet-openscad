@@ -6,10 +6,10 @@
     <title>DUET 創作者深度訪談</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        :root { --gold: #d4af37; --bg: #0a0e14; --glass: rgba(255, 255, 255, 0.1); }
+        :root { --gold: #d4af37; --bg: #0a0e14; }
         
         body { 
-            font-family: "Noto Sans TC", sans-serif; 
+            font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; 
             background-image: url('https://raw.githubusercontent.com/brendon-create/duet-openscad/main/survey/desk.jpg');
             background-size: cover;
             background-position: center;
@@ -22,50 +22,63 @@
         
         .container { 
             max-width: 1200px; margin: 40px auto; 
-            background: rgba(10, 14, 20, 0.6); 
+            background: rgba(10, 14, 20, 0.65); /* 稍微調透明一點 */
             padding: 50px 70px; border-radius: 24px; 
-            backdrop-filter: blur(25px); 
+            backdrop-filter: blur(20px); 
             border: 1px solid rgba(255,255,255,0.1); 
-            box-shadow: 0 25px 50px rgba(0,0,0,0.6); 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
         }
         
-        h1 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 4px; }
-        .concept-note { text-align: center; color: #aaa; font-size: 20px; margin-bottom: 40px; }
+        h1 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 4px; font-weight: 300; }
+        .concept-note { text-align: center; color: #aaa; font-size: 20px; margin-bottom: 40px; padding: 0 20px; }
         .question-group { margin-bottom: 70px; padding-bottom: 50px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-        label { display: block; font-size: 26px; margin-bottom: 15px; color: var(--gold); }
+        label { display: block; font-size: 26px; margin-bottom: 15px; color: var(--gold); font-weight: 400; }
         
-        input, textarea, select {
+        input[type="text"], input[type="email"], textarea, select {
             width: 100%; padding: 18px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
             border-radius: 10px; color: #fff; font-size: 24px; transition: 0.3s; box-sizing: border-box; font-family: inherit;
         }
         input:focus, textarea:focus { outline: none; border-color: var(--gold); background: rgba(255,255,255,0.12); }
 
-        /* 照片兩列排版 */
+        /* 圖片兩排佈局 */
         .image-options { display: grid; grid-template-columns: 1fr 1fr; gap: 100px 80px; margin-top: 80px; padding: 20px; }
         .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 15px; overflow: hidden; transition: 0.4s; background: #1a1a1a; transform: scale(1.1); }
-        .img-card img { width: 100%; height: 320px; object-fit: cover; filter: grayscale(10%); }
-        #mag-options .img-card img { height: 450px; object-fit: contain; }
-        .img-card p { font-size: 18px; text-align: center; padding: 15px; background: rgba(0,0,0,0.8); margin: 0; }
-        .img-card.selected { border-color: var(--gold); box-shadow: 0 0 30px rgba(212, 175, 55, 0.5); }
+        .img-card img { width: 100%; height: 320px; object-fit: cover; display: block; filter: grayscale(10%); }
+        #mag-options .img-card img { height: 450px; object-fit: contain; background: #000; }
+        .img-card p { font-size: 18px; text-align: center; padding: 15px; background: rgba(0,0,0,0.85); margin: 0; }
+        .img-card.selected { border-color: var(--gold); box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); }
 
-        /* Liquid Glass 成功視窗 */
+        /* 第 14 題絕對置中優化 */
+        .font-selection-wrapper { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 60px; 
+            width: 100%; max-width: 800px; margin: 40px auto; 
+        }
+        .font-selection-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .font-trigger { 
+            width: 260px; padding: 16px; background: rgba(255,255,255,0.1); border: 1px solid var(--gold); 
+            border-radius: 10px; color: var(--gold); font-size: 20px; cursor: pointer; transition: 0.3s; text-align: center;
+        }
+        .font-trigger:hover { background: rgba(212, 175, 55, 0.15); }
+
+        /* Liquid Glass 成功彈窗 */
         #success-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.4); z-index: 10000; justify-content: center; align-items: center;
-            backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);
         }
         .glass-panel {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 35px;
             padding: 60px; text-align: center; max-width: 500px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 0 20px rgba(255,255,255,0.1);
-            animation: panelFade 0.5s ease-out;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 0 20px rgba(255,255,255,0.1);
+            animation: panelFade 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        @keyframes panelFade { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes panelFade { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-        .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 22px; margin-top: 30px; }
+        .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 24px; margin-top: 30px; letter-spacing: 2px; }
         
-        .other-music-input { margin-top: 15px; display: none; }
+        #font-selector-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; padding: 40px; box-sizing: border-box; }
+        .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; overflow-y: auto; height: 75vh; }
+        .font-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; cursor: pointer; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
     </style>
 </head>
 <body>
@@ -75,8 +88,8 @@
     <p class="concept-note">「美好的關係，是兩個人各自保有自我，並在交集中找到和諧與共鳴。」</p>
     
     <div class="question-group" style="display: flex; gap: 20px;">
-        <div style="flex:1;"><label>您的姓名</label><input type="text" id="name"></div>
-        <div style="flex:1;"><label>您的 E-mail</label><input type="email" id="email"></div>
+        <div style="flex:1;"><label>您的姓名</label><input type="text" id="name" placeholder="請輸入姓名"></div>
+        <div style="flex:1;"><label>您的 E-mail</label><input type="email" id="email" placeholder="example@gmail.com"></div>
     </div>
 
     <div class="question-group">
@@ -86,31 +99,31 @@
             <input type="text" id="L2" maxlength="1" placeholder="B" style="width:100px; text-align:center;" oninput="updateDynamicLabels()">
         </div>
     </div>
-    
-    <div class="question-group">
-        <label id="label_Q2">2. 「？」對您的意義是什麼？</label>
-        <textarea id="Q1_reason" rows="2"></textarea>
-    </div>
 
-    <div class="question-group">
-        <label id="label_Q3">3. 「？」對您的意義是什麼？</label>
-        <textarea id="Q1_2_reason" rows="2"></textarea>
-    </div>
+    <div class="question-group"><label id="label_Q2">2. 「？」對您的意義是什麼？</label><textarea id="Q1_reason" rows="2"></textarea></div>
+    <div class="question-group"><label id="label_Q3">3. 「？」對您的意義是什麼？</label><textarea id="Q1_2_reason" rows="2"></textarea></div>
+
+    <div class="question-group"><label>4. 你們最重要的共通點是什麼？</label><textarea id="Q2" rows="2"></textarea></div>
+    <div class="question-group"><label>5. 你們之間最難忘的共同回憶？</label><textarea id="Q2_5" rows="2"></textarea></div>
+    <div class="question-group"><label>6. 對方為你的生命帶來了什麼不同？</label><textarea id="Q3" rows="3"></textarea></div>
+    <div class="question-group"><label>7. 你想透過這件作品傳達什麼給對方？</label><textarea id="Q3_5" rows="2"></textarea></div>
+    <div class="question-group"><label>8. 請用三個形容詞描述對方？</label><input type="text" id="Q4" placeholder="例如：優雅、溫暖、堅韌"></div>
+    <div class="question-group"><label>9. 對方在你生命中為什麼重要？</label><textarea id="Q5" rows="3"></textarea></div>
+    <div class="question-group"><label>10. 你最欣賞你送禮對象的哪一點？</label><textarea id="Q5_5" rows="3"></textarea></div>
 
     <div class="question-group">
         <label>11. 您們兩人的相處模式，最像音樂中的哪種曲風？</label>
         <select id="Q6" onchange="toggleMusicOther()">
             <option value="平靜悠揚的鋼琴二重奏">平靜悠揚的鋼琴二重奏</option>
             <option value="互補且自由的爵士即興">互補且自由的爵士即興</option>
-            <option value="澎湃激昂的交響樂">澎湃激昂的交響樂</option>
             <option value="激情萬丈的探戈舞曲">激情萬丈的探戈舞曲</option>
+            <option value="澎湃激昂的交響樂">澎湃激昂的交響樂</option>
             <option value="韓國流行樂">韓國流行樂</option>
             <option value="華語流行樂">華語流行樂</option>
             <option value="搖滾">搖滾</option>
-            <option value="電影原聲帶">電影原聲帶</option>
-            <option value="其他">其他 (請自行填寫)</option>
+            <option value="其他">其他</option>
         </select>
-        <input type="text" id="Q6_other" class="other-music-input" placeholder="請輸入您心中的音樂風格...">
+        <input type="text" id="Q6_other" style="display:none; margin-top:15px;" placeholder="請描述您心中的音樂風格...">
     </div>
 
     <div class="question-group">
@@ -120,6 +133,7 @@
             <div class="img-card" onclick="selectImg('room', '溫潤木質北歐風', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%BA%AB%E6%BD%A4%E6%9C%A8%E8%B3%AA%E5%8C%97%E6%AD%90%E9%A2%A8.jpg"><p>溫潤木質北歐風</p></div>
             <div class="img-card" onclick="selectImg('room', '純粹極簡風', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B4%94%E7%B2%B9%E6%A5%B5%E7%B0%A1%E9%A2%A8.jpg"><p>純粹極簡風</p></div>
             <div class="img-card" onclick="selectImg('room', '植栽綠意風', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%A4%8D%E6%A0%BD%E7%B6%A0%E6%84%8F%E9%A2%A8.jpg"><p>植栽綠意風</p></div>
+            <div class="img-card" onclick="selectImg('room', '華麗古典風', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E8%8F%AF%E9%BA%97%E5%8F%A4%E5%85%B8%E9%A2%A8.jpg"><p>華麗古典風</p></div>
         </div>
         <input type="hidden" id="Q7_val">
     </div>
@@ -129,28 +143,80 @@
         <div class="image-options" id="mag-options">
             <div class="img-card" onclick="selectImg('mag', '時尚留白', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%99%82%E5%B0%9A%E7%95%99%E7%99%BD%E9%9B%9C%E8%AA%8C.jpg"><p>時尚留白</p></div>
             <div class="img-card" onclick="selectImg('mag', '大膽色塊', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E5%A4%A7%E8%86%BD%E8%89%B2%E5%A1%8A%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>大膽色塊</p></div>
+            <div class="img-card" onclick="selectImg('mag', '人文藝術', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E4%BA%BA%E6%96%87%E8%97%9D%E8%A1%93%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>人文藝術</p></div>
+            <div class="img-card" onclick="selectImg('mag', '經典排版', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B6%93%E5%85%B8%E6%8E%92%E7%89%88%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>經典排版</p></div>
         </div>
         <input type="hidden" id="Q8_val">
     </div>
 
+    <div class="question-group" style="background: rgba(212, 175, 55, 0.05); padding: 40px; border-radius: 20px; border: 1px dashed rgba(212, 175, 55, 0.3);">
+        <label style="text-align: center; margin-bottom: 30px;">14. 選擇字體風格</label>
+        <div class="font-selection-wrapper">
+            <div class="font-selection-item">
+                <label id="btn_label_L1" style="font-size: 20px;">字母 ？ 字體</label>
+                <div id="font1_display" class="font-trigger" onclick="openFontSelector(1)">點擊挑選</div>
+            </div>
+            <div class="font-selection-item">
+                <label id="btn_label_L2" style="font-size: 20px;">字母 ？ 字體</label>
+                <div id="font2_display" class="font-trigger" onclick="openFontSelector(2)">點擊挑選</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="question-group"><label id="label_Q15">15. 字母 ？ 選擇 ？ 原因？</label><textarea id="font1_r" rows="2"></textarea></div>
+    <div class="question-group"><label id="label_Q16">16. 字母 ？ 選擇 ？ 原因？</label><textarea id="font2_r" rows="2"></textarea></div>
+
     <button id="submitBtn" class="submit-btn" onclick="submitForm()">確認提交回覆</button>
 </div>
 
-<div id="success-modal">
-    <div class="glass-panel">
-        <h2 style="color: var(--gold); font-size: 32px; margin-bottom: 20px;">提交成功</h2>
-        <p style="font-size: 20px; color: #fff; margin-bottom: 30px;">感謝您為 DUET 注入靈魂。<br>我們已收到您的創作深度訪談。</p>
-        <button onclick="location.reload()" style="background: var(--gold); border:none; padding:12px 40px; border-radius:30px; font-weight:600; cursor:pointer;">返回</button>
-    </div>
-</div>
+<div id="success-modal"><div class="glass-panel"><h2 style="color:var(--gold); font-size:38px; margin-bottom:20px;">提交成功</h2><p style="font-size:22px; color:#fff; margin-bottom:35px;">感謝您為 DUET 注入靈魂。<br>您的訪談回覆已送達。</p><button onclick="location.reload()" style="background:var(--gold); border:none; padding:15px 50px; border-radius:30px; font-weight:600; cursor:pointer;">返回首頁</button></div></div>
+
+<div id="font-selector-modal"><div style="max-width:1200px; margin:0 auto; height:100%; display:flex; flex-direction:column;"><h2 style="color:var(--gold); padding:20px;">挑選字體風格</h2><div class="font-grid" id="font-list-container"></div><button onclick="closeFontSelector()" style="width:100%; padding:15px; background:#333; color:#fff; border:none; margin-top:20px; cursor:pointer;">關閉</button></div></div>
 
 <script>
+    const allFonts = ["Abel", "Abril Fatface", "Advent Pro", "Alegreya", "Alex Brush", "Alfa Slab One", "Alice", "Allura", "Amatic SC", "Amiri", "Anton", "Arapey", "Archivo", "Armata", "Artifika", "Arvo", "Audiowide", "Average", "Baloo 2", "Bangers", "Bebas Neue", "Belgrano", "Bentham", "Bitter", "Bree Serif", "Bubblegum Sans", "Bungee", "Cabin", "Cantata One", "Caudex", "Caveat", "Chivo", "Cinzel", "Comfortaa", "Commissioner", "Cookie", "Copse", "Cormorant Garamond", "Courier Prime", "Coustard", "Creepster", "Cutive Mono", "DM Serif Text", "Dancing Script", "Dosis", "EB Garamond", "Eczar", "Encode Sans", "Fauna One", "Fira Code", "Fira Sans", "Fjalla One", "Fugaz One", "Gelasio", "Gloria Hallelujah", "Great Vibes", "Handlee", "Hind", "Holtwood One SC", "Inconsolata", "Indie Flower", "Jost", "Kalam", "Kanit", "Karla", "Lexend", "Lobster", "Merriweather", "Neuton", "Nunito", "Old Standard TT", "Orbitron", "Oswald", "Outfit", "Pacifico", "Passion One", "Pathway Gothic One", "Patrick Hand", "Paytone One", "Playfair Display", "Poppins", "Prata", "Quicksand", "Righteous", "Rubik", "Russo One", "Sacramento", "Secular One", "Shadows Into Light", "Share Tech Mono", "Shrikhand", "Sniglet", "Space Grotesk", "Space Mono", "Spectral", "Tangerine", "Titan One", "Varela Round", "Vollkorn", "Zilla Slab"];
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwqPAlaIjQR3G4xn6ZMe4gx_DAyJeMVBrQIZzpoUQYwtAy7oQhlrt_ZVCkoShExXV6K7w/exec";
+    let activeSlot = 1;
+
     function toggleMusicOther() {
-        const select = document.getElementById('Q6');
-        const otherInput = document.getElementById('Q6_other');
-        otherInput.style.display = (select.value === '其他') ? 'block' : 'none';
+        const s = document.getElementById('Q6');
+        document.getElementById('Q6_other').style.display = (s.value === '其他') ? 'block' : 'none';
     }
 
+    function updateDynamicLabels() {
+        const l1 = document.getElementById('L1').value || "？";
+        const l2 = document.getElementById('L2').value || "？";
+        const f1 = document.getElementById('font1_display').textContent === "點擊挑選" ? "？" : document.getElementById('font1_display').textContent;
+        const f2 = document.getElementById('font2_display').textContent === "點擊挑選" ? "？" : document.getElementById('font2_display').textContent;
+        document.getElementById('label_Q2').textContent = `2. 「${l1}」對您的意義是什麼？`;
+        document.getElementById('label_Q3').textContent = `3. 「${l2}」對您的意義是什麼？`;
+        document.getElementById('btn_label_L1').textContent = `字母 ${l1} 字體`;
+        document.getElementById('btn_label_L2').textContent = `字母 ${l2} 字體`;
+        document.getElementById('label_Q15').textContent = `15. 字母 ${l1} 選擇 ${f1} 的原因？`;
+        document.getElementById('label_Q16').textContent = `16. 字母 ${l2} 選擇 ${f2} 的原因？`;
+    }
+
+    function openFontSelector(slot) {
+        activeSlot = slot;
+        const targetChar = (slot === 1) ? (document.getElementById('L1').value || "A") : (document.getElementById('L2').value || "B");
+        const container = document.getElementById('font-list-container');
+        container.innerHTML = '';
+        allFonts.forEach(font => {
+            const card = document.createElement('div');
+            card.className = 'font-card';
+            card.style.fontFamily = `'${font}', sans-serif`;
+            card.innerHTML = `<div style="font-size:36px; margin-bottom:5px;">${targetChar}</div><div style="font-size:14px;">${font}</div>`;
+            card.onclick = () => {
+                const d = document.getElementById(`font${activeSlot}_display`);
+                d.textContent = font; d.style.fontFamily = `'${font}', sans-serif`;
+                updateDynamicLabels(); closeFontSelector();
+            };
+            container.appendChild(card);
+        });
+        document.getElementById('font-selector-modal').style.display = 'block';
+    }
+
+    function closeFontSelector() { document.getElementById('font-selector-modal').style.display = 'none'; }
     function selectImg(type, val, el) {
         document.querySelectorAll(`#${type}-options .img-card`).forEach(c => c.classList.remove('selected'));
         el.classList.add('selected');
@@ -161,22 +227,28 @@
         const btn = document.getElementById('submitBtn');
         const name = document.getElementById('name').value;
         if (!name) { alert("請填寫姓名"); return; }
+        btn.disabled = true; btn.textContent = "傳送中...";
+        let gV = document.getElementById('Q6').value;
+        if (gV === '其他') gV = document.getElementById('Q6_other').value;
 
-        btn.disabled = true;
-        btn.textContent = "傳送中...";
-
-        // 模擬發送流程，實際請套用您的 fetch 邏輯
-        setTimeout(() => {
-            document.getElementById('success-modal').style.display = 'flex';
-        }, 1500);
+        const data = {
+            name: name, email: document.getElementById('email').value,
+            L1: document.getElementById('L1').value || "A", L2: document.getElementById('L2').value || "B",
+            Q1_reason: document.getElementById('Q1_reason').value, Q1_2_reason: document.getElementById('Q1_2_reason').value,
+            Q2: document.getElementById('Q2').value, Q2_5: document.getElementById('Q2_5').value,
+            Q3: document.getElementById('Q3').value, Q3_5: document.getElementById('Q3_5').value,
+            Q4: document.getElementById('Q4').value, Q5: document.getElementById('Q5').value,
+            Q5_5: document.getElementById('Q5_5').value, Q6: gV,
+            Q7: document.getElementById('Q7_val').value, Q8: document.getElementById('Q8_val').value,
+            font1: document.getElementById('font1_display').textContent, font2: document.getElementById('font2_display').textContent,
+            font1_r: document.getElementById('font1_r').value, font2_r: document.getElementById('font2_r').value
+        };
+        const p = new URLSearchParams(data).toString();
+        fetch(scriptURL + "?" + p, { method: 'POST', mode: 'no-cors' })
+        .then(() => { document.getElementById('success-modal').style.display = 'flex'; })
+        .catch(() => { alert("提交失敗"); btn.disabled = false; });
     }
-
-    function updateDynamicLabels() {
-        const l1 = document.getElementById('L1').value || "？";
-        const l2 = document.getElementById('L2').value || "？";
-        document.getElementById('label_Q2').textContent = `2. 「${l1}」對您的意義是什麼？`;
-        document.getElementById('label_Q3').textContent = `3. 「${l2}」對您的意義是什麼？`;
-    }
+    updateDynamicLabels();
 </script>
 </body>
 </html>
