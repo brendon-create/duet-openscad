@@ -22,7 +22,7 @@
         
         .container { 
             max-width: 1200px; margin: 40px auto; 
-            background: rgba(10, 14, 20, 0.65); /* 稍微調透明一點 */
+            background: rgba(10, 14, 20, 0.65); 
             padding: 50px 70px; border-radius: 24px; 
             backdrop-filter: blur(20px); 
             border: 1px solid rgba(255,255,255,0.1); 
@@ -40,7 +40,6 @@
         }
         input:focus, textarea:focus { outline: none; border-color: var(--gold); background: rgba(255,255,255,0.12); }
 
-        /* 圖片兩排佈局 */
         .image-options { display: grid; grid-template-columns: 1fr 1fr; gap: 100px 80px; margin-top: 80px; padding: 20px; }
         .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 15px; overflow: hidden; transition: 0.4s; background: #1a1a1a; transform: scale(1.1); }
         .img-card img { width: 100%; height: 320px; object-fit: cover; display: block; filter: grayscale(10%); }
@@ -48,7 +47,6 @@
         .img-card p { font-size: 18px; text-align: center; padding: 15px; background: rgba(0,0,0,0.85); margin: 0; }
         .img-card.selected { border-color: var(--gold); box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); }
 
-        /* 第 14 題絕對置中優化 */
         .font-selection-wrapper { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 60px; 
             width: 100%; max-width: 800px; margin: 40px auto; 
@@ -60,7 +58,6 @@
         }
         .font-trigger:hover { background: rgba(212, 175, 55, 0.15); }
 
-        /* Liquid Glass 成功彈窗 */
         #success-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(8px);
@@ -77,7 +74,14 @@
         .submit-btn { width: 100%; padding: 22px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 24px; margin-top: 30px; letter-spacing: 2px; }
         
         #font-selector-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; padding: 40px; box-sizing: border-box; }
-        .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; overflow-y: auto; height: 75vh; }
+        
+        .font-grid { 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 20px; 
+            overflow-y: auto; 
+            height: 75vh; 
+        }
         .font-card { background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; cursor: pointer; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
     </style>
 </head>
@@ -175,6 +179,7 @@
 
 <script>
     const allFonts = ["Abel", "Abril Fatface", "Advent Pro", "Alegreya", "Alex Brush", "Alfa Slab One", "Alice", "Allura", "Amatic SC", "Amiri", "Anton", "Arapey", "Archivo", "Armata", "Artifika", "Arvo", "Audiowide", "Average", "Baloo 2", "Bangers", "Bebas Neue", "Belgrano", "Bentham", "Bitter", "Bree Serif", "Bubblegum Sans", "Bungee", "Cabin", "Cantata One", "Caudex", "Caveat", "Chivo", "Cinzel", "Comfortaa", "Commissioner", "Cookie", "Copse", "Cormorant Garamond", "Courier Prime", "Coustard", "Creepster", "Cutive Mono", "DM Serif Text", "Dancing Script", "Dosis", "EB Garamond", "Eczar", "Encode Sans", "Fauna One", "Fira Code", "Fira Sans", "Fjalla One", "Fugaz One", "Gelasio", "Gloria Hallelujah", "Great Vibes", "Handlee", "Hind", "Holtwood One SC", "Inconsolata", "Indie Flower", "Jost", "Kalam", "Kanit", "Karla", "Lexend", "Lobster", "Merriweather", "Neuton", "Nunito", "Old Standard TT", "Orbitron", "Oswald", "Outfit", "Pacifico", "Passion One", "Pathway Gothic One", "Patrick Hand", "Paytone One", "Playfair Display", "Poppins", "Prata", "Quicksand", "Righteous", "Rubik", "Russo One", "Sacramento", "Secular One", "Shadows Into Light", "Share Tech Mono", "Shrikhand", "Sniglet", "Space Grotesk", "Space Mono", "Spectral", "Tangerine", "Titan One", "Varela Round", "Vollkorn", "Zilla Slab"];
+    
     const scriptURL = "https://script.google.com/macros/s/AKfycbwqPAlaIjQR3G4xn6ZMe4gx_DAyJeMVBrQIZzpoUQYwtAy7oQhlrt_ZVCkoShExXV6K7w/exec";
     let activeSlot = 1;
 
@@ -201,15 +206,28 @@
         const targetChar = (slot === 1) ? (document.getElementById('L1').value || "A") : (document.getElementById('L2').value || "B");
         const container = document.getElementById('font-list-container');
         container.innerHTML = '';
+        
         allFonts.forEach(font => {
+            // 【優化載入】：檢查是否已經載入過該字體，避免 head 堆積
+            const fontId = `font-link-${font.replace(/\s+/g, '-')}`;
+            if (!document.getElementById(fontId)) {
+                const link = document.createElement('link');
+                link.id = fontId;
+                link.rel = 'stylesheet';
+                link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/\s+/g, '+')}&display=swap`;
+                document.head.appendChild(link);
+            }
+
             const card = document.createElement('div');
             card.className = 'font-card';
-            card.style.fontFamily = `'${font}', sans-serif`;
+            card.style.fontFamily = `"${font}", sans-serif`;
             card.innerHTML = `<div style="font-size:36px; margin-bottom:5px;">${targetChar}</div><div style="font-size:14px;">${font}</div>`;
             card.onclick = () => {
                 const d = document.getElementById(`font${activeSlot}_display`);
-                d.textContent = font; d.style.fontFamily = `'${font}', sans-serif`;
-                updateDynamicLabels(); closeFontSelector();
+                d.textContent = font; 
+                d.style.fontFamily = `"${font}", sans-serif`;
+                updateDynamicLabels(); 
+                closeFontSelector();
             };
             container.appendChild(card);
         });
@@ -217,6 +235,7 @@
     }
 
     function closeFontSelector() { document.getElementById('font-selector-modal').style.display = 'none'; }
+    
     function selectImg(type, val, el) {
         document.querySelectorAll(`#${type}-options .img-card`).forEach(c => c.classList.remove('selected'));
         el.classList.add('selected');
