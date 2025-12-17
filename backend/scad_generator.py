@@ -200,7 +200,8 @@ def generate_stl_two_stage(letter1, letter2, font1, font2, size,
     logger.info(f"   字母: {letter1} + {letter2}")
     logger.info(f"   字體: {font1} + {font2}")
     logger.info(f"   尺寸: {size}mm")
-    logger.info(f"   墜頭: X={pendant_x}, Y={pendant_y}, Z={pendant_z}, Rot={pendant_rotation_y}°")
+    logger.info(f"   相對墜頭: X={relative_bail_x:.3f}, Y={relative_bail_y:.3f}, Z={relative_bail_z:.3f}")
+    logger.info(f"   旋轉: {pendant_rotation_y}°")
     logger.info("=" * 60)
     
     cleanup_files = []
