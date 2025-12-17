@@ -13,7 +13,7 @@ Line ~1105-1127: 旋轉矩陣邏輯                // Letter 旋轉（applyMatri
 Line ~1022: showInitialSphere()             // 初始金球
 Line ~1000: ambientLight(0xffffff, 0.9)    // 環境光亮度（已優化）
 Line ~1390: innerRadius=2.0, tubeRadius=0.7 // 墜頭尺寸（前後端一致）
-Line ~1840: thumbnailCamera Z-up設定        // 購物車縮圖站立
+Line ~1840: thumbnailCamera Z-up + position(20,-28,6) // 購物車縮圖（站立+放大）
 Line ~937: allFonts = [...] 100種精選字體   // 前後端都支援的字體清單
 ```
 

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DUET 創作者深度訪談</title>
+    <style>
+        :root { --gold: #d4af37; --bg: #0a0e14; }
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background-color: var(--bg); color: #fff; line-height: 1.6; padding: 20px; margin: 0; /* 整體縮小 */
+    zoom: 0.7; 
+    -moz-transform: scale(0.7);
+    -moz-transform-origin: top center;
+    
+    /* 提升基礎字體大小 */
+    font-size: 20px;}
+        .container { max-width: 850px; margin: 40px auto; background: rgba(255,255,255,0.03); padding: 50px; border-radius: 24px; backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        h1 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 4px; font-weight: 300; }
+        .concept-note { text-align: center; color: #aaa; font-size: 20px; margin-bottom: 40px; padding: 0 20px; line-height: 1.8; }
+        .question-group { margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        label { display: block; font-size: 26px; margin-bottom: 15px; color: var(--gold); font-weight: 500; }
+        
+        .info-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; }
+        .info-name { flex: 0 0 180px; min-width: 150px; }
+        .info-email { flex: 1; min-width: 250px; }
+
+        input[type="text"], input[type="email"], textarea, select {
+        width: 100%; padding: 18px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 10px; color: #fff; font-size: 24px; transition: 0.3s; box-sizing: border-box;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--gold); background: rgba(255,255,255,0.12); }
+
+        .font-trigger {
+            width: 100%; padding: 14px; background: rgba(255,255,255,0.1); border: 1px solid var(--gold);
+            border-radius: 10px; color: var(--gold); font-size: 16px; cursor: pointer; text-align: left;
+        }
+
+        .image-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-top: 10px; }
+        .img-card { cursor: pointer; border: 2px solid transparent; border-radius: 12px; overflow: hidden; transition: 0.4s; position: relative; background: #1a1a1a; }
+        .img-card img { width: 100%; height: 160px; object-fit: cover; display: block; filter: grayscale(10%); }
+        #mag-options .img-card img { height: 220px; object-fit: contain; background: #000; }
+        .img-card p { font-size: 12px; text-align: center; padding: 10px 5px; background: rgba(0,0,0,0.8); margin: 0; color: #ccc; min-height: 34px; display: flex; align-items: center; justify-content: center; }
+        .img-card.selected { border-color: var(--gold); box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); }
+
+        #font-selector-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.98); z-index: 9999; padding: 40px; box-sizing: border-box;
+        }
+        .modal-body { max-width: 1200px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; }
+        .font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; overflow-y: auto; padding: 20px 0; }
+        .font-card { background: rgba(255,255,255,0.05); padding: 30px 20px; border-radius: 12px; text-align: center; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
+        .preview-char { font-size: 48px; margin-bottom: 10px; color: #fff; line-height: 1; letter-spacing: 2px; }
+        
+        .submit-btn { width: 100%; padding: 18px; background: var(--gold); color: #000; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 18px; margin-top: 30px; transition: 0.3s; letter-spacing: 2px; }
+        .submit-btn:disabled { background: #555; cursor: not-allowed; }
+
+        #other-genre-container { margin-top: 15px; display: none; }
+
+        .font-selection-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .font-selection-item {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>DUET 創作者深度訪談</h1>
+    <p class="concept-note">
+        「美好的關係，是兩個人各自保有自我，並在交集中找到和諧與共鳴。」<br>
+        您的回覆將成為這件作品最珍貴的設計靈魂。
+    </p>
+    
+    <div class="question-group info-row">
+        <div class="info-name">
+            <label>您的姓名</label>
+            <input type="text" id="name" placeholder="請輸入姓名">
+        </div>
+        <div class="info-email">
+            <label>您的 E-mail</label>
+            <input type="email" id="email" placeholder="example@gmail.com">
+        </div>
+    </div>
+
+    <div class="question-group">
+        <label>1. 如果要訂製一個由兩個英文字母垂直交疊交織的飾品，您會選哪兩個字母？</label>
+        <div style="display:flex; gap:15px; margin-bottom:15px;">
+            <input type="text" id="L1" maxlength="1" placeholder="A" style="width:70px; text-align:center; font-size: 24px; font-weight: bold;" oninput="updateLabels()">
+            <input type="text" id="L2" maxlength="1" placeholder="B" style="width:70px; text-align:center; font-size: 24px; font-weight: bold;" oninput="updateLabels()">
+        </div>
+        <textarea id="Q1_reason" rows="2" placeholder="請分享這兩個字母對您的意義..."></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>2. 關於這份關係：你們之間最難忘的一個共同點是什麼？</label>
+        <textarea id="Q2" rows="2" placeholder="例如：我們都熱愛挑戰未知..."></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>3. 生命的新元素：發現自己的生命空間多出了哪些寶貴元素？</label>
+        <textarea id="Q3" rows="3" placeholder="請描述這份關係帶來的改變..."></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>4. 形象轉譯：形容對方的三個形容詞是什麼？</label>
+        <input type="text" id="Q4" placeholder="例如：優雅、堅韌、溫和">
+    </div>
+
+    <div class="question-group">
+        <label>5. 關係的重量：他對您來說為什麼重要？</label>
+        <textarea id="Q5" rows="4" placeholder="請描述這份關係在您生命中的份量..."></textarea>
+    </div>
+
+    <div class="question-group">
+        <label>6. 您們兩人的相處模式，最像音樂中的哪種曲風？</label>
+        <select id="Q6" onchange="toggleOtherGenre()">
+            <option value="" disabled selected>請選擇一種風格</option>
+            <option value="平靜悠揚的鋼琴二重奏">平靜悠揚的鋼琴二重奏</option>
+            <option value="互補且自由的爵士即興">互補且自由的爵士即興</option>
+            <option value="澎湃激昂的交響樂">澎湃激昂的交響樂</option>
+            <option value="純粹和諧的阿卡貝拉">純粹和諧的阿卡貝拉</option>
+            <option value="溫暖日常的民謠吉他">溫暖日常的民謠吉他</option>
+            <option value="充滿張力的探戈舞曲">充滿張力的探戈舞曲</option>
+            <option value="韓國流行樂 (K-Pop)">韓國流行樂 (K-Pop)</option>
+            <option value="國語流行樂">國語流行樂</option>
+            <option value="動漫音樂 (Anime OST)">動漫音樂 (Anime OST)</option>
+            <option value="史詩電影配樂">史詩電影配樂</option>
+            <option value="other">其他（請自行填寫）</option>
+        </select>
+        <div id="other-genre-container">
+            <input type="text" id="Q6_other" placeholder="請輸入您覺得最像的曲風...">
+        </div>
+    </div>
+
+    <div class="question-group">
+        <label>7. 如果這份「關係」是一個共處空間，哪種氣氛最接近？</label>
+        <div class="image-options" id="room-options">
+            <div class="img-card" onclick="selectImg('room', '水泥工業', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%A1%AC%E6%B4%BE%E6%B0%B4%E6%B3%A5%E5%B7%A5%E6%A5%AD%E9%A2%A8.jpg"><p>硬派水泥工業風</p></div>
+            <div class="img-card" onclick="selectImg('room', '溫潤木質', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%BA%AB%E6%BD%A4%E6%9C%A8%E8%B3%AA%E5%8C%97%E6%AD%90%E9%A2%A8.jpg"><p>溫潤木質北歐風</p></div>
+            <div class="img-card" onclick="selectImg('room', '自然植栽', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%A4%8D%E6%A0%BD%E7%B6%A0%E6%84%8F%E9%A2%A8.jpg"><p>自然綠意系</p></div>
+            <div class="img-card" onclick="selectImg('room', '極簡主義', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B4%94%E7%B2%B9%E6%A5%B5%E7%B0%A1%E9%A2%A8.jpg"><p>純粹極簡風</p></div>
+        </div>
+        <input type="hidden" id="Q7_val">
+    </div>
+
+    <div class="question-group">
+        <label>8. 如果要把你們的故事做成雜誌封面，您選擇哪種排版？</label>
+        <div class="image-options" id="mag-options">
+            <div class="img-card" onclick="selectImg('mag', '時尚留白', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E6%99%82%E5%B0%9A%E7%95%99%E7%99%BD%E9%9B%9C%E8%AA%8C.jpg"><p>時尚留白風格</p></div>
+            <div class="img-card" onclick="selectImg('mag', '大膽色塊', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E5%A4%A7%E8%86%BD%E8%89%B2%E5%A1%8A%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>大膽色塊風格</p></div>
+            <div class="img-card" onclick="selectImg('mag', '人文藝術', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E4%BA%BA%E6%96%87%E8%97%9D%E8%A1%93%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>人文藝術風格</p></div>
+            <div class="img-card" onclick="selectImg('mag', '經典排版', this)"><img src="https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/%E7%B6%93%E5%85%B8%E6%8E%92%E7%89%88%E9%A2%A8%E6%A0%BC%E9%9B%9C%E8%AA%8C.jpg"><p>經典排版風格</p></div>
+        </div>
+        <input type="hidden" id="Q8_val">
+    </div>
+
+    <div class="question-group" style="background: rgba(212, 175, 55, 0.05); padding: 30px; border-radius: 15px; border: 1px dashed var(--gold);">
+        <label style="font-size: 24px; text-align: center;">字體選擇</label>
+        <div class="font-selection-wrapper">
+            <div class="font-selection-item">
+                <label id="label_L1" style="font-size: 21px; opacity: 0.8;">字母 A 字體：</label>
+                <div id="font1_display" class="font-trigger" onclick="openFontSelector(1)">點擊挑選</div>
+            </div>
+            <div class="font-selection-item">
+                <label id="label_L2" style="font-size: 21px; opacity: 0.8;">字母 B 字體：</label>
+                <div id="font2_display" class="font-trigger" onclick="openFontSelector(2)">點擊挑選</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="question-group">
+        <label>10. 最後，請分享您選擇這兩款字體的原因？</label>
+        <textarea id="Q10_reason" rows="3" placeholder="請描述這兩款字體給您的感受..."></textarea>
+    </div>
+
+    <button id="submitBtn" class="submit-btn" onclick="submitForm()">確認提交回覆</button>
+</div>
+
+<div id="font-selector-modal">
+    <div class="modal-body">
+        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 id="modal-title" style="color: var(--gold);">挑選字體</h2>
+            <button onclick="closeFontSelector()" style="background:none; border:none; color:#fff; font-size:40px; cursor:pointer;">&times;</button>
+        </div>
+        <div class="font-grid" id="font-list-container"></div>
+    </div>
+</div>
+
+<script>
+    const allFonts = ["Abel", "Abril Fatface", "Advent Pro", "Alegreya", "Alex Brush", "Alfa Slab One", "Alice", "Allura", "Amatic SC", "Amiri", "Anton", "Arapey", "Archivo", "Armata", "Artifika", "Arvo", "Audiowide", "Average", "Baloo 2", "Bangers", "Bebas Neue", "Belgrano", "Bentham", "Bitter", "Bree Serif", "Bubblegum Sans", "Bungee", "Cabin", "Cantata One", "Caudex", "Caveat", "Chivo", "Cinzel", "Comfortaa", "Commissioner", "Cookie", "Copse", "Cormorant Garamond", "Courier Prime", "Coustard", "Creepster", "Cutive Mono", "DM Serif Text", "Dancing Script", "Dosis", "EB Garamond", "Eczar", "Encode Sans", "Fauna One", "Fira Code", "Fira Sans", "Fjalla One", "Fugaz One", "Gelasio", "Gloria Hallelujah", "Great Vibes", "Handlee", "Hind", "Holtwood One SC", "Inconsolata", "Indie Flower", "Jost", "Kalam", "Kanit", "Karla", "Lexend", "Lobster", "Merriweather", "Neuton", "Nunito", "Old Standard TT", "Orbitron", "Oswald", "Outfit", "Pacifico", "Passion One", "Pathway Gothic One", "Patrick Hand", "Paytone One", "Playfair Display", "Poppins", "Prata", "Quicksand", "Righteous", "Rubik", "Russo One", "Sacramento", "Secular One", "Shadows Into Light", "Share Tech Mono", "Shrikhand", "Sniglet", "Space Grotesk", "Space Mono", "Spectral", "Tangerine", "Titan One", "Varela Round", "Vollkorn", "Zilla Slab"];
+
+    const scriptURL = "https://script.google.com/macros/s/AKfycbwqPAlaIjQR3G4xn6ZMe4gx_DAyJeMVBrQIZzpoUQYwtAy7oQhlrt_ZVCkoShExXV6K7w/exec";
+    let activeSlot = 1;
+    let savedScrollPosition = 0; // 用於記錄位置
+
+    function updateLabels() {
+        const char1 = document.getElementById('L1').value.toUpperCase() || "A";
+        const char2 = document.getElementById('L2').value.toUpperCase() || "B";
+        document.getElementById('label_L1').textContent = `字母 ${char1} 字體：`;
+        document.getElementById('label_L2').textContent = `字母 ${char2} 字體：`;
+    }
+
+    function toggleOtherGenre() {
+        const select = document.getElementById('Q6');
+        const otherContainer = document.getElementById('other-genre-container');
+        otherContainer.style.display = (select.value === 'other') ? 'block' : 'none';
+    }
+
+    function openFontSelector(slot) {
+        savedScrollPosition = window.pageYOffset || document.documentElement.scrollTop; // 記錄捲動位置
+        activeSlot = slot;
+        const targetChar = (slot === 1) ? (document.getElementById('L1').value.toUpperCase() || "A") : (document.getElementById('L2').value.toUpperCase() || "B");
+        document.getElementById('modal-title').textContent = `為字母 ${targetChar} 挑選字體`;
+        const container = document.getElementById('font-list-container');
+        container.innerHTML = '';
+        
+        allFonts.forEach(font => {
+            const card = document.createElement('div');
+            card.className = 'font-card';
+            card.style.fontFamily = `'${font}', sans-serif`;
+            card.innerHTML = `<div class="preview-char">${targetChar}</div><div style="font-size:12px; opacity:0.6;">${font}</div>`;
+            
+            const link = document.createElement('link');
+            link.href = `https://fonts.googleapis.com/css2?family=${font.replace(/ /g, '+')}&display=swap`;
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+
+            card.onclick = () => {
+                const displayDiv = document.getElementById(`font${activeSlot}_display`);
+                displayDiv.textContent = font;
+                displayDiv.style.fontFamily = `'${font}', sans-serif`;
+                closeFontSelector();
+            };
+            container.appendChild(card);
+        });
+        document.getElementById('font-selector-modal').style.display = 'block';
+    }
+
+    function closeFontSelector() { 
+        document.getElementById('font-selector-modal').style.display = 'none';
+        // 恢復到開啟前的位置
+        window.scrollTo(0, savedScrollPosition);
+    }
+    
+    function selectImg(type, val, el) {
+        document.querySelectorAll(`#${type}-options .img-card`).forEach(card => card.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById(`Q${type==='room'?7:8}_val`).value = val;
+    }
+
+    function submitForm() {
+        const btn = document.getElementById('submitBtn');
+        const name = document.getElementById('name').value;
+        if(!name) { alert("請填寫您的姓名"); return; }
+
+        btn.disabled = true;
+        btn.textContent = "發送中，請稍候...";
+
+        let genreValue = document.getElementById('Q6').value;
+        if (genreValue === 'other') {
+            genreValue = document.getElementById('Q6_other').value || "其他（未填寫）";
+        }
+
+        const data = {
+            name: name,
+            email: document.getElementById('email').value,
+            L1: document.getElementById('L1').value || "A",
+            L2: document.getElementById('L2').value || "B",
+            Q1_reason: document.getElementById('Q1_reason').value,
+            Q2: document.getElementById('Q2').value,
+            Q3: document.getElementById('Q3').value,
+            Q4: document.getElementById('Q4').value,
+            Q5: document.getElementById('Q5').value,
+            Q6: genreValue,
+            Q7: document.getElementById('Q7_val').value,
+            Q8: document.getElementById('Q8_val').value,
+            font1: document.getElementById('font1_display').textContent,
+            font2: document.getElementById('font2_display').textContent,
+            Q10_reason: document.getElementById('Q10_reason').value
+        };
+
+        const params = new URLSearchParams(data).toString();
+
+        fetch(scriptURL + "?" + params, { method: 'POST' })
+            .then(res => {
+                alert("提交成功！感謝您為 DUET 注入靈魂。");
+                btn.textContent = "提交成功";
+            })
+            .catch(err => {
+                alert("提交失敗，請檢查網路。");
+                btn.disabled = false;
+                btn.textContent = "重新提交";
+            });
+    }
+    updateLabels();
+</script>
+</body>
+</html>
