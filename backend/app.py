@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 import subprocess
 import tempfile
-from scad_generator import generate_scad_script
+from scad_generator_new import generate_stl_two_stage
 import logging
 
 app = Flask(__name__)
@@ -202,8 +202,8 @@ def generate_stl():
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
-        # 生成 OpenSCAD 腳本
-        scad_content = generate_scad_script(
+        # ✅ 使用兩階段生成（自動居中 + 墜頭）
+        stl_path, cleanup_files = generate_stl_two_stage(
             letter1=letter1,
             letter2=letter2,
             font1=font1,
@@ -215,61 +215,7 @@ def generate_stl():
             pendant_rotation_y=pendant_rotation
         )
         
-        # 記錄 Letter 2 的旋轉邏輯（用於驗證版本）
-        if 'rotate([0, 0, 90])' in scad_content:
-            logger.info("✅ Using nested rotation (correct version)")
-        elif 'rotate([90, 0, 90])' in scad_content:
-            logger.info("❌ Using single rotation (old version)")
-        else:
-            logger.warning("⚠️ Rotation pattern not recognized")
-        
-        # 建立臨時檔案
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
-            scad_file.write(scad_content)
-            scad_path = scad_file.name
-        
-        stl_path = scad_path.replace('.scad', '.stl')
-        
-        logger.info(f"SCAD file: {scad_path}")
-        logger.info(f"STL file: {stl_path}")
-        
-        # 執行 OpenSCAD (使用 xvfb 虛擬顯示)
-        cmd = [
-            'openscad',
-            '-o', stl_path,
-            '--export-format', 'binstl',
-            scad_path
-        ]
-        
-        logger.info(f"Running command: {' '.join(cmd)}")
-        
-        # 設定環境變數使用 xvfb
-        env = os.environ.copy()
-        env['DISPLAY'] = ':99'
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,  # 3 分鐘 - 支援高精度參數
-            env=env
-        )
-        
-        if result.returncode != 0:
-            logger.error(f"OpenSCAD error: {result.stderr}")
-            return jsonify({
-                'error': 'OpenSCAD execution failed',
-                'details': result.stderr
-            }), 500
-        
-        # 檢查 STL 檔案是否生成
-        if not os.path.exists(stl_path):
-            logger.error("STL file not generated")
-            return jsonify({
-                'error': 'STL file not generated'
-            }), 500
-        
-        logger.info(f"STL generated successfully: {stl_path}")
+        logger.info(f"✅ STL generated successfully: {stl_path}")
         
         # 發送檔案
         response = send_file(
@@ -283,8 +229,9 @@ def generate_stl():
         @response.call_on_close
         def cleanup():
             try:
-                os.unlink(scad_path)
-                os.unlink(stl_path)
+                for f in cleanup_files:
+                    if os.path.exists(f):
+                        os.unlink(f)
                 logger.info("Temporary files cleaned up")
             except Exception as e:
                 logger.warning(f"Cleanup error: {e}")
