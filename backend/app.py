@@ -181,19 +181,35 @@ def generate_stl():
         font2 = data.get('font2', 'Roboto')
         size = data.get('size', 20)
         
-        # 支援兩種參數格式：扁平或嵌套
-        if 'bailX' in data:
-            # 扁平格式（前端發送的）
+        # 支援兩種參數格式：新版（相對位置）或舊版
+        if 'relativeBailX' in data:
+            # ✅ 新版：使用相對位置
+            relative_bail_x = data.get('relativeBailX', 0)
+            relative_bail_y = data.get('relativeBailY', 0)
+            relative_bail_z = data.get('relativeBailZ', 0)
+            pendant_rotation = data.get('bailRotation', 0)
+            # 前端的主體中心
+            model_center_x = data.get('modelCenterX', 0)
+            model_center_y = data.get('modelCenterY', 0)
+            model_center_z = data.get('modelCenterZ', 0)
+            logger.info(f"✅ 使用相對位置模式")
+            logger.info(f"   相對墜頭位置: ({relative_bail_x:.3f}, {relative_bail_y:.3f}, {relative_bail_z:.3f})")
+        elif 'bailX' in data:
+            # 舊版：扁平格式（向後兼容）
             pendant_x = data.get('bailX', 0)
             pendant_y = data.get('bailY', 0)
             pendant_z = data.get('bailZ', 0)
             pendant_rotation = data.get('bailRotation', 0)
-            # ✅ 接收前端計算的 modelCenter
             model_center_x = data.get('modelCenterX', 0)
             model_center_y = data.get('modelCenterY', 0)
             model_center_z = data.get('modelCenterZ', 0)
+            # 計算相對位置
+            relative_bail_x = pendant_x
+            relative_bail_y = pendant_y
+            relative_bail_z = pendant_z
+            logger.info(f"⚠️ 使用舊版格式（向後兼容）")
         else:
-            # 嵌套格式（舊版）
+            # 更舊版：嵌套格式
             pendant_config = data.get('pendant', {})
             pendant_x = pendant_config.get('x', 0)
             pendant_y = pendant_config.get('y', 0)
@@ -202,24 +218,28 @@ def generate_stl():
             model_center_x = 0
             model_center_y = 0
             model_center_z = 0
+            relative_bail_x = pendant_x
+            relative_bail_y = pendant_y
+            relative_bail_z = pendant_z
+            logger.info(f"⚠️ 使用最舊版格式")
         
-        logger.info(f"Pendant params: x={pendant_x}, y={pendant_y}, z={pendant_z}, rotation={pendant_rotation}")
-        logger.info(f"Model center (from frontend): ({model_center_x}, {model_center_y}, {model_center_z})")
+        logger.info(f"🎯 墜頭旋轉: {pendant_rotation}°")
+        logger.info(f"📍 主體中心 (前端): ({model_center_x:.3f}, {model_center_y:.3f}, {model_center_z:.3f})")
         
         # 驗證並標準化字體名稱
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
-        # ✅ 使用兩階段生成（使用前端的 center）
+        # ✅ 使用兩階段生成（相對位置模式）
         stl_path, cleanup_files = generate_stl_two_stage(
             letter1=letter1,
             letter2=letter2,
             font1=font1,
             font2=font2,
             size=size,
-            pendant_x=pendant_x,
-            pendant_y=pendant_y,
-            pendant_z=pendant_z,
+            relative_bail_x=relative_bail_x,
+            relative_bail_y=relative_bail_y,
+            relative_bail_z=relative_bail_z,
             pendant_rotation_y=pendant_rotation,
             frontend_center_x=model_center_x,
             frontend_center_y=model_center_y,

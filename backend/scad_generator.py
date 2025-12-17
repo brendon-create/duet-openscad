@@ -77,17 +77,17 @@ def calculate_stl_center(stl_path):
         raise
 
 
-def generate_scad_final_with_bail(temp_stl_path, center, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
-    """第二階段：import 居中的模型 + 加墜頭"""
+def generate_scad_final_with_bail(temp_stl_path, center, relative_bail_x, relative_bail_y, relative_bail_z, pendant_rotation_y):
+    """第二階段：import 居中的模型 + 加墜頭（使用相對位置）"""
     
     bail_radius = 2.0
     bail_tube = 0.7
     bail_rotation_with_offset = pendant_rotation_y + 90
     
-    # 墜頭位置（相對於居中後的原點）
-    pos_x = pendant_x
-    pos_y = pendant_y
-    pos_z = (size / 2.0) + 2.0 + pendant_z
+    # ✅ 墜頭絕對位置 = 主體中心 + 相對位置
+    pos_x = float(center[0]) + relative_bail_x
+    pos_y = float(center[1]) + relative_bail_y
+    pos_z = float(center[2]) + relative_bail_z
     
     # 居中偏移（反向）
     offset_x = -float(center[0])
@@ -97,7 +97,7 @@ def generate_scad_final_with_bail(temp_stl_path, center, size, pendant_x, pendan
     # 轉換 Windows 路徑為 OpenSCAD 格式（如果需要）
     import_path = temp_stl_path.replace('\\', '/')
     
-    scad_script = f'''// DUET - Stage 2: Import + Center + Bail
+    scad_script = f'''// DUET - Stage 2: Import + Center + Bail (相對位置模式)
 $fn = 64;
 
 pos_x = {pos_x};
@@ -184,7 +184,8 @@ def run_openscad(scad_script, output_stl_path, env=None):
             pass
 
 
-def generate_stl_two_stage(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y, 
+def generate_stl_two_stage(letter1, letter2, font1, font2, size, 
+                          relative_bail_x, relative_bail_y, relative_bail_z, pendant_rotation_y, 
                           frontend_center_x=0, frontend_center_y=0, frontend_center_z=0):
     """
     完整的兩階段生成流程
@@ -222,12 +223,14 @@ def generate_stl_two_stage(letter1, letter2, font1, font2, size, pendant_x, pend
         logger.info("\n📏 使用前端計算的 center...")
         center = np.array([frontend_center_x, frontend_center_y, frontend_center_z])
         logger.info(f"✅ 前端 Center: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})")
+        logger.info(f"✅ 相對墜頭位置: ({relative_bail_x:.3f}, {relative_bail_y:.3f}, {relative_bail_z:.3f})")
         
         # === 第二階段：居中 + 墜頭 ===
         logger.info("\n📦 Stage 2: 居中 + 墜頭...")
         scad_final = generate_scad_final_with_bail(
-            temp_stl_1, center, size,
-            pendant_x, pendant_y, pendant_z, pendant_rotation_y
+            temp_stl_1, center, 
+            relative_bail_x, relative_bail_y, relative_bail_z,
+            pendant_rotation_y
         )
         
         final_stl = tempfile.NamedTemporaryFile(suffix='_final.stl', delete=False).name
