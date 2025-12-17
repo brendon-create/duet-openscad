@@ -188,6 +188,10 @@ def generate_stl():
             pendant_y = data.get('bailY', 0)
             pendant_z = data.get('bailZ', 0)
             pendant_rotation = data.get('bailRotation', 0)
+            # ✅ 接收前端計算的 modelCenter
+            model_center_x = data.get('modelCenterX', 0)
+            model_center_y = data.get('modelCenterY', 0)
+            model_center_z = data.get('modelCenterZ', 0)
         else:
             # 嵌套格式（舊版）
             pendant_config = data.get('pendant', {})
@@ -195,14 +199,18 @@ def generate_stl():
             pendant_y = pendant_config.get('y', 0)
             pendant_z = pendant_config.get('z', 0)
             pendant_rotation = pendant_config.get('rotation_y', 0)
+            model_center_x = 0
+            model_center_y = 0
+            model_center_z = 0
         
         logger.info(f"Pendant params: x={pendant_x}, y={pendant_y}, z={pendant_z}, rotation={pendant_rotation}")
+        logger.info(f"Model center (from frontend): ({model_center_x}, {model_center_y}, {model_center_z})")
         
         # 驗證並標準化字體名稱
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
-        # ✅ 使用兩階段生成（自動居中 + 墜頭）
+        # ✅ 使用兩階段生成（使用前端的 center）
         stl_path, cleanup_files = generate_stl_two_stage(
             letter1=letter1,
             letter2=letter2,
@@ -212,7 +220,10 @@ def generate_stl():
             pendant_x=pendant_x,
             pendant_y=pendant_y,
             pendant_z=pendant_z,
-            pendant_rotation_y=pendant_rotation
+            pendant_rotation_y=pendant_rotation,
+            frontend_center_x=model_center_x,
+            frontend_center_y=model_center_y,
+            frontend_center_z=model_center_z
         )
         
         logger.info(f"✅ STL generated successfully: {stl_path}")

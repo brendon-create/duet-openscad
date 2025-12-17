@@ -184,7 +184,8 @@ def run_openscad(scad_script, output_stl_path, env=None):
             pass
 
 
-def generate_stl_two_stage(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
+def generate_stl_two_stage(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y, 
+                          frontend_center_x=0, frontend_center_y=0, frontend_center_z=0):
     """
     完整的兩階段生成流程
     
@@ -217,10 +218,10 @@ def generate_stl_two_stage(letter1, letter2, font1, font2, size, pendant_x, pend
         run_openscad(scad_intersection, temp_stl_1, env)
         logger.info(f"✅ Stage 1 完成: {temp_stl_1}")
         
-        # === 計算中心 ===
-        logger.info("\n📏 計算 bounding box center...")
-        center = calculate_stl_center(temp_stl_1)
-        logger.info(f"✅ 中心計算完成: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})")
+        # === 使用前端的中心（不計算 STL） ===
+        logger.info("\n📏 使用前端計算的 center...")
+        center = np.array([frontend_center_x, frontend_center_y, frontend_center_z])
+        logger.info(f"✅ 前端 Center: ({center[0]:.3f}, {center[1]:.3f}, {center[2]:.3f})")
         
         # === 第二階段：居中 + 墜頭 ===
         logger.info("\n📦 Stage 2: 居中 + 墜頭...")
