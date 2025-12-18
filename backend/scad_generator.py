@@ -30,7 +30,8 @@ def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, ba
     pos_x = 0 + bailRelativeX
     pos_y = 0 + bailRelativeY
     pos_z = 0 + bailRelativeZ
-    bail_rotation_deg = bailRotation
+    # 前端墜頭有初始 90° 旋轉（geometry.rotateZ(Math.PI/2)），後端需要加上這個偏移
+    bail_rotation_deg = bailRotation + 90
     
     scad_script = f'''// DUET Z-Up System
 $fn = {fn};
