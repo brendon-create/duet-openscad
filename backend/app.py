@@ -3,7 +3,7 @@ from flask_cors import CORS
 import os
 import subprocess
 import tempfile
-from scad_generator import generate_stl_two_stage
+from scad_generator import generate_scad_script
 import logging
 
 app = Flask(__name__)
@@ -181,72 +181,95 @@ def generate_stl():
         font2 = data.get('font2', 'Roboto')
         size = data.get('size', 20)
         
-        # 支援兩種參數格式：新版（相對位置）或舊版
-        if 'relativeBailX' in data:
-            # ✅ 新版：使用相對位置
-            relative_bail_x = data.get('relativeBailX', 0)
-            relative_bail_y = data.get('relativeBailY', 0)
-            relative_bail_z = data.get('relativeBailZ', 0)
-            pendant_rotation = data.get('bailRotation', 0)
-            # 前端的主體中心
-            model_center_x = data.get('modelCenterX', 0)
-            model_center_y = data.get('modelCenterY', 0)
-            model_center_z = data.get('modelCenterZ', 0)
-            logger.info(f"✅ 使用相對位置模式")
-            logger.info(f"   相對墜頭位置: ({relative_bail_x:.3f}, {relative_bail_y:.3f}, {relative_bail_z:.3f})")
-        elif 'bailX' in data:
-            # 舊版：扁平格式（向後兼容）
+        # 支援兩種參數格式：扁平或嵌套
+        if 'bailX' in data:
+            # 扁平格式（前端發送的）
             pendant_x = data.get('bailX', 0)
             pendant_y = data.get('bailY', 0)
             pendant_z = data.get('bailZ', 0)
             pendant_rotation = data.get('bailRotation', 0)
-            model_center_x = data.get('modelCenterX', 0)
-            model_center_y = data.get('modelCenterY', 0)
-            model_center_z = data.get('modelCenterZ', 0)
-            # 計算相對位置
-            relative_bail_x = pendant_x
-            relative_bail_y = pendant_y
-            relative_bail_z = pendant_z
-            logger.info(f"⚠️ 使用舊版格式（向後兼容）")
         else:
-            # 更舊版：嵌套格式
+            # 嵌套格式（舊版）
             pendant_config = data.get('pendant', {})
             pendant_x = pendant_config.get('x', 0)
             pendant_y = pendant_config.get('y', 0)
             pendant_z = pendant_config.get('z', 0)
             pendant_rotation = pendant_config.get('rotation_y', 0)
-            model_center_x = 0
-            model_center_y = 0
-            model_center_z = 0
-            relative_bail_x = pendant_x
-            relative_bail_y = pendant_y
-            relative_bail_z = pendant_z
-            logger.info(f"⚠️ 使用最舊版格式")
         
-        logger.info(f"🎯 墜頭旋轉: {pendant_rotation}°")
-        logger.info(f"📍 主體中心 (前端): ({model_center_x:.3f}, {model_center_y:.3f}, {model_center_z:.3f})")
+        logger.info(f"Pendant params: x={pendant_x}, y={pendant_y}, z={pendant_z}, rotation={pendant_rotation}")
         
         # 驗證並標準化字體名稱
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
-        # ✅ 使用兩階段生成（相對位置模式）
-        stl_path, cleanup_files = generate_stl_two_stage(
+        # 生成 OpenSCAD 腳本
+        scad_content = generate_scad_script(
             letter1=letter1,
             letter2=letter2,
             font1=font1,
             font2=font2,
             size=size,
-            relative_bail_x=relative_bail_x,
-            relative_bail_y=relative_bail_y,
-            relative_bail_z=relative_bail_z,
-            pendant_rotation_y=pendant_rotation,
-            frontend_center_x=model_center_x,
-            frontend_center_y=model_center_y,
-            frontend_center_z=model_center_z
+            pendant_x=pendant_x,
+            pendant_y=pendant_y,
+            pendant_z=pendant_z,
+            pendant_rotation_y=pendant_rotation
         )
         
-        logger.info(f"✅ STL generated successfully: {stl_path}")
+        # 記錄 Letter 2 的旋轉邏輯（用於驗證版本）
+        if 'rotate([0, 0, 90])' in scad_content:
+            logger.info("✅ Using nested rotation (correct version)")
+        elif 'rotate([90, 0, 90])' in scad_content:
+            logger.info("❌ Using single rotation (old version)")
+        else:
+            logger.warning("⚠️ Rotation pattern not recognized")
+        
+        # 建立臨時檔案
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
+            scad_file.write(scad_content)
+            scad_path = scad_file.name
+        
+        stl_path = scad_path.replace('.scad', '.stl')
+        
+        logger.info(f"SCAD file: {scad_path}")
+        logger.info(f"STL file: {stl_path}")
+        
+        # 執行 OpenSCAD (使用 xvfb 虛擬顯示)
+        cmd = [
+            'openscad',
+            '-o', stl_path,
+            '--export-format', 'binstl',
+            scad_path
+        ]
+        
+        logger.info(f"Running command: {' '.join(cmd)}")
+        
+        # 設定環境變數使用 xvfb
+        env = os.environ.copy()
+        env['DISPLAY'] = ':99'
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=180,  # 3 分鐘 - 支援高精度參數
+            env=env
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"OpenSCAD error: {result.stderr}")
+            return jsonify({
+                'error': 'OpenSCAD execution failed',
+                'details': result.stderr
+            }), 500
+        
+        # 檢查 STL 檔案是否生成
+        if not os.path.exists(stl_path):
+            logger.error("STL file not generated")
+            return jsonify({
+                'error': 'STL file not generated'
+            }), 500
+        
+        logger.info(f"STL generated successfully: {stl_path}")
         
         # 發送檔案
         response = send_file(
@@ -260,9 +283,8 @@ def generate_stl():
         @response.call_on_close
         def cleanup():
             try:
-                for f in cleanup_files:
-                    if os.path.exists(f):
-                        os.unlink(f)
+                os.unlink(scad_path)
+                os.unlink(stl_path)
                 logger.info("Temporary files cleaned up")
             except Exception as e:
                 logger.warning(f"Cleanup error: {e}")

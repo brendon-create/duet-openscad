@@ -18,17 +18,24 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
         fn = 48
     
     depth = size * 5.0
-    bail_radius = 1.85
-    bail_tube = 0.35
+    
+    # 墜頭規格 - 與前端一致
+    # 目標：內徑 1.5mm, 管徑 0.7mm
+    # OpenSCAD: translate([bail_radius, 0]) circle(r=bail_tube)
+    # 內徑半徑 = bail_radius - bail_tube = 0.75mm
+    # 因此：bail_tube = 0.35, bail_radius = 1.1
+    bail_tube = 0.35      # 管半徑 (管徑 = 0.7mm)
+    bail_radius = 1.1     # 到管中心的距離 (內徑 = 1.5mm)
+    
     bail_rotation_with_offset = pendant_rotation_y + 90
     
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"🔧 DEBUG: pendant_rotation_y={pendant_rotation_y}, bail_rotation_with_offset={bail_rotation_with_offset}")
     
-    # 墜頭位置（修正映射）
-    pos_x = pendant_x  # X 就是 X
-    pos_y = pendant_y  # Y 就是 Y
+    # 墜頭位置
+    pos_x = 0 + pendant_x
+    pos_y = 0 + pendant_y
     pos_z = (size / 2.0) + 2.0 + pendant_z
     
     scad_script = f'''// DUET Z-Up System

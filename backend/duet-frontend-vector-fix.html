@@ -1831,6 +1831,12 @@
             const font1Name = font1Select ? font1Select.value : document.getElementById('font1-btn').getAttribute('data-selected');
             const font2Name = font2Select ? font2Select.value : document.getElementById('font2-btn').getAttribute('data-selected');
             
+            // 計算墜頭相對於主體中心的向量
+            const bailRelativeX = bailMesh ? (bailMesh.position.x - modelCenter.x) : 0;
+            const bailRelativeY = bailMesh ? (bailMesh.position.y - modelCenter.y) : 0;
+            const bailRelativeZ = bailMesh ? (bailMesh.position.z - modelCenter.z) : 0;
+            const bailRot = bailMesh ? (bailMesh.rotation.z * 180 / Math.PI) : 0;
+            
             const item = {
                 id: Date.now(),
                 letter1: document.getElementById('letter1').value,
@@ -1843,6 +1849,11 @@
                 weight: document.getElementById('weight-display').textContent,
                 quantity: 1,
                 price: 5000,
+                // 儲存墜頭相對向量
+                bailRelativeX: bailRelativeX,
+                bailRelativeY: bailRelativeY,
+                bailRelativeZ: bailRelativeZ,
+                bailRotation: bailRot,
                 mesh: mainMesh.clone(),
                 bail: bailMesh ? bailMesh.clone() : null
             };
@@ -1990,164 +2001,76 @@
         }
 
         async function checkout() {
-            console.log('🛒 開始結帳流程...');
-            
-            // === 1. 驗證模型 ===
-            if (!mainMesh) {
-                alert('❌ 請先生成 3D 模型\n\n步驟：\n1. 選擇兩個字母\n2. 選擇字體\n3. 等待模型生成');
-                console.error('❌ mainMesh 不存在');
+            if (cartItems.length === 0) {
+                alert('購物車是空的！');
                 return;
             }
-            
-            console.log('✅ 模型存在，準備生成 STL...');
-            
-            // === 2. UI 狀態更新 ===
+
             const checkoutBtn = document.getElementById('checkout');
-            if (!checkoutBtn) {
-                console.error('❌ 找不到 checkout 按鈕');
-                return;
-            }
-            
             const originalText = checkoutBtn.textContent;
-            checkoutBtn.textContent = '⏳ 生成中...';
-            checkoutBtn.disabled = true;
-            checkoutBtn.style.cursor = 'wait';
             
             try {
-                // === 3. 收集參數 ===
-                const letter1Element = document.getElementById('letter1');
-                const letter2Element = document.getElementById('letter2');
-                const sizeElement = document.getElementById('size');
-                const bailXElement = document.getElementById('bailX');
-                const bailYElement = document.getElementById('bailY');
-                const bailZElement = document.getElementById('bailZ');
-                const bailRotationElement = document.getElementById('bailRotation');
-                const font1Btn = document.getElementById('font1-btn');
-                const font2Btn = document.getElementById('font2-btn');
+                checkoutBtn.textContent = `正在生成 ${cartItems.length} 個 STL...`;
+                checkoutBtn.disabled = true;
                 
-                // 驗證所有元素存在
-                if (!letter1Element || !letter2Element || !sizeElement) {
-                    throw new Error('頁面元素缺失，請重新載入頁面');
+                // 為購物車中每個物件生成 STL
+                for (let i = 0; i < cartItems.length; i++) {
+                    const item = cartItems[i];
+                    checkoutBtn.textContent = `正在生成 ${i + 1}/${cartItems.length}...`;
+                    
+                    const params = {
+                        letter1: item.letter1,
+                        letter2: item.letter2,
+                        font1: item.font1,
+                        font2: item.font2,
+                        size: parseInt(item.size),
+                        // 傳送墜頭相對向量
+                        bailRelativeX: parseFloat(item.bailRelativeX || 0),
+                        bailRelativeY: parseFloat(item.bailRelativeY || 0),
+                        bailRelativeZ: parseFloat(item.bailRelativeZ || 0),
+                        bailRotation: parseFloat(item.bailRotation || 0)
+                    };
+                    
+                    const response = await fetch(`${BACKEND_URL}/generate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/octet-stream'
+                        },
+                        body: JSON.stringify(params),
+                        mode: 'cors'
+                    });
+                    
+                    if (!response.ok) throw new Error('生成失敗');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `DUET_${params.letter1}${params.letter2}_${params.size}mm_${Date.now()}.stl`;
+                    
+                    document.body.appendChild(a);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    // 延遲避免瀏覽器阻擋
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
-                const params = {
-                    letter1: letter1Element.value || 'A',
-                    letter2: letter2Element.value || 'B',
-                    font1: font1Btn ? (font1Btn.getAttribute('data-selected') || 'Roboto') : 'Roboto',
-                    font2: font2Btn ? (font2Btn.getAttribute('data-selected') || 'Roboto') : 'Roboto',
-                    size: parseInt(sizeElement.value) || 20,
-                    bailX: bailXElement ? parseFloat(bailXElement.value) : 0,
-                    bailY: bailYElement ? parseFloat(bailYElement.value) : 0,
-                    bailZ: bailZElement ? parseFloat(bailZElement.value) : 0,
-                    bailRotation: bailRotationElement ? parseFloat(bailRotationElement.value) : 0
-                };
-                
-                console.log('📤 發送參數到後端:', params);
-                console.log('🎯 目標 URL:', `${BACKEND_URL}/api/generate-stl`);
-                
-                // === 4. 呼叫後端 API ===
-                console.log('⏳ 正在生成 STL，請稍候...');
-                
-                const response = await fetch(`${BACKEND_URL}/generate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/octet-stream'
-                    },
-                    body: JSON.stringify(params),
-                    mode: 'cors'
-                });
-                
-                console.log('📡 後端回應狀態:', response.status, response.statusText);
-                
-                // === 5. 處理錯誤 ===
-                if (!response.ok) {
-                    let errorMessage = '生成失敗';
-                    try {
-                        const errorData = await response.json();
-                        errorMessage = errorData.error || errorData.details || errorMessage;
-                        console.error('❌ 後端錯誤:', errorData);
-                    } catch (e) {
-                        console.error('❌ 無法解析錯誤訊息');
-                    }
-                    throw new Error(errorMessage);
-                }
-                
-                // === 6. 下載 STL 檔案 ===
-                console.log('📥 開始下載 STL...');
-                
-                const blob = await response.blob();
-                console.log('📦 STL 大小:', (blob.size / 1024).toFixed(2), 'KB');
-                
-                if (blob.size === 0) {
-                    throw new Error('生成的 STL 檔案為空');
-                }
-                
-                // 建立下載連結
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `DUET_${params.letter1}${params.letter2}_${params.size}mm_${Date.now()}.stl`;
-                
-                // 觸發下載
-                document.body.appendChild(a);
-                a.click();
-                
-                // 清理
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-                
-                console.log('✅ STL 檔案下載成功:', a.download);
-                
-                // === 7. 成功提示 ===
-                alert(`✅ STL 檔案已生成並下載！
-
-檔案名稱: ${a.download}
-
-📋 下一步：
-1. 用 PrusaSlicer 打開 STL
-2. 檢查模型是否直立
-3. 檢查是否全綠色（無破面）
-4. 開始切片並列印！
-
-💡 提示：
-- 如果有紅色/橘色面，請回報問題
-- 建議列印參數：0.2mm 層高，20% 填充`);
-                
-                // === 8. 清空購物車 ===
+                alert(`✅ ${cartItems.length} 個 STL 檔案已生成並下載！`);
                 cartItems = [];
+                updateCartDisplay();
                 closeCart();
-                console.log('🛒 購物車已清空');
                 
             } catch (error) {
-                // === 錯誤處理 ===
-                console.error('❌ 生成 STL 錯誤:', error);
-                console.error('錯誤堆疊:', error.stack);
-                
-                let userMessage = `❌ STL 生成失敗\n\n`;
-                userMessage += `錯誤訊息: ${error.message}\n\n`;
-                userMessage += `可能原因：\n`;
-                userMessage += `1. 網路連線問題\n`;
-                userMessage += `2. 後端服務暫時忙碌中\n`;
-                userMessage += `3. 字體或參數不支援\n\n`;
-                userMessage += `建議：\n`;
-                userMessage += `• 請稍後再試\n`;
-                userMessage += `• 或嘗試選擇不同字體\n`;
-                userMessage += `• 檢查網路連線\n\n`;
-                userMessage += `技術資訊: ${BACKEND_URL}`;
-                
-                alert(userMessage);
-                
+                alert(`❌ STL 生成失敗\n${error.message}`);
             } finally {
-                // === 恢復按鈕狀態 ===
-                if (checkoutBtn) {
-                    checkoutBtn.textContent = originalText;
-                    checkoutBtn.disabled = false;
-                    checkoutBtn.style.cursor = 'pointer';
-                }
-                console.log('🔄 按鈕狀態已恢復');
+                checkoutBtn.textContent = originalText;
+                checkoutBtn.disabled = false;
             }
         }
 

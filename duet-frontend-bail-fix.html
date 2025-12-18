@@ -685,25 +685,6 @@
             font-size: 12px;
             letter-spacing: 3px;
         }
-        #updating-badge {
-            position: fixed;
-            top: 200px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            color: #d4af37;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 11px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            letter-spacing: 1.5px;
-            z-index: 3000;
-            display: none;
-            font-weight: 300;
-            text-transform: uppercase;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        }
     </style>
 </head>
 <body>
@@ -831,7 +812,6 @@
             <div class="version-label">SLOT 2</div>
         </div>
     </div>
-    <div id="updating-badge">Generating...</div>
 
     <!-- Font Selector Modal -->
     <div id="font-selector-modal">
@@ -1043,8 +1023,7 @@
         // 初始化場景（Z-up 系統）
         function initScene() {
             scene = new THREE.Scene();
-            // 創建獨立的背景場景（可旋轉，不影響主場景）
-            const backgroundScene = new THREE.Scene();
+            
             camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.up.set(0, 0, 1); // Z-up 系統
             // 從物件前方稍微偏右上，15度俯角觀看 45 度夾角
@@ -1072,11 +1051,9 @@
             scene.add(directionalLight);
 
             const rgbeLoader = new RGBELoader();
-            rgbeLoader.load('https://raw.githubusercontent.com/brendon-create/duet-openscad/main/images/studio_small_08_1k.hdr',
+            rgbeLoader.load('https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr', 
                 (texture) => {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
-                    texture.offset.z = 0.75;  // 試試 0, 0.25, 0.5, 0.75
-                    texture.wrapS = THREE.RepeatWrapping;  // 允許水平重複
                     envMap = texture;
                     scene.environment = envMap;
                     showInitialSphere();
@@ -1102,18 +1079,12 @@
                 metalness: mat.metalness,
                 roughness: roughness,
                 envMap: envMap,
-                envMapIntensity: finish === 'glossy' ? 2.0 : 1.0,
-                polygonOffset: true,
-                polygonOffsetFactor: 1,
-                polygonOffsetUnits: 1
+                envMapIntensity: finish === 'glossy' ? 2.0 : 1.0
             });
         }
 
         // 3D 建模（Z-up 系統：XY 水平面，Z 軸向上）
         async function generateModel() {
-            // 顯示 Generating 提示
-            document.getElementById('updating-badge').style.display = 'block';
-
             const l1 = document.getElementById('letter1').value;
             const l2 = document.getElementById('letter2').value;
             
@@ -1156,11 +1127,11 @@
                 font: null,
                 size: 50,
                 height: depth,
-                curveSegments: 24,  // 增加到 32（更平滑的曲線）
+                curveSegments: 32,  // 增加到 32（更平滑的曲線）
                 bevelEnabled: true,
-                bevelThickness: 1.5,  // 增加 bevel 厚度
-                bevelSize: 0.6,       // 增加 bevel 大小
-                bevelSegments: 12     // 增加 bevel 段數（更平滑）
+                bevelThickness: 2.0,  // 增加 bevel 厚度
+                bevelSize: 0.8,       // 增加 bevel 大小
+                bevelSegments: 16     // 增加 bevel 段數（更平滑）
             };
 
             // === 字母 1 (正面)：將字母平面從 XY 轉到 XZ，擠出方向從 Z 轉到 Y ===
@@ -1266,9 +1237,6 @@
             createBail();
             updateVolumeWeight();
             console.log('Generation complete!'); // Debug
-
-            // 隱藏 Generating 提示
-            document.getElementById('updating-badge').style.display = 'none';
         }
 
         // 從 opentype.js 字體轉換為 Three.js typeface 格式
@@ -1454,9 +1422,13 @@
             
             if (!mainMesh) return;
             
-            const innerRadius = 1.5;
-            const tubeRadius = 0.7;
-            const geometry = new THREE.TorusGeometry(innerRadius + tubeRadius, tubeRadius, 16, 32);
+            // 墜頭規格：內徑 1.5mm, 管徑 0.7mm
+            const innerDiameter = 1.5;    // 內徑 (mm)
+            const tubeDiameter = 0.7;     // 管徑 (mm)
+            const innerRadius = innerDiameter / 2;  // 0.75
+            const tubeRadius = tubeDiameter / 2;    // 0.35
+            const torusRadius = innerRadius + tubeRadius;  // 1.1 (到管中心的距離)
+            const geometry = new THREE.TorusGeometry(torusRadius, tubeRadius, 16, 32);
             
             // 將 Torus 從 XY 平面轉到 XZ 平面 (站立)
             geometry.rotateX(Math.PI / 2);
@@ -1585,16 +1557,8 @@
             document.getElementById('char-input').addEventListener('input', (e) => {
                 const char = e.target.value || 'A';
                 document.querySelectorAll('.preview-char').forEach(el => {
-                el.textContent = char;
+                    el.textContent = char;
                 });
-    
-                // 同步到訂製參數視窗
-                if (char.length >= 1) {
-                    document.getElementById('letter1').value = char[0].toUpperCase();
-                }
-                if (char.length >= 2) {
-                    document.getElementById('letter2').value = char[1].toUpperCase();
-                }
             });
 
             document.getElementById('select-all-checkbox').addEventListener('change', (e) => {
@@ -1624,18 +1588,7 @@
 
         function openFontSelector() {
             document.getElementById('font-selector-modal').classList.add('active');
-    
-            // 同步字母到字體選擇視窗
-            const letter1 = document.getElementById('letter1').value || 'A';
-            const letter2 = document.getElementById('letter2').value || 'B';
-            const charInput = document.getElementById('char-input');
-            charInput.value = letter1 + letter2;
-    
-            // 更新預覽
-            document.querySelectorAll('.preview-char').forEach(el => {
-            el.textContent = letter1 + letter2;
-            });
-        } 
+        }
 
         function closeFontSelector() {
             document.getElementById('font-selector-modal').classList.remove('active');
@@ -1889,12 +1842,7 @@
                 font1: font1Name,
                 font2: font2Name,
                 material: document.getElementById('material').value,
-                finish: document.getElementById('finish').value,
-                size: parseInt(document.getElementById('size').value),
-                bailX: parseFloat(document.getElementById('bailX').value),
-                bailY: parseFloat(document.getElementById('bailY').value),
-                bailZ: parseFloat(document.getElementById('bailZ').value),
-                bailRotation: parseFloat(document.getElementById('bailRotation').value),
+                size: document.getElementById('size').value,
                 volume: document.getElementById('volume-display').textContent,
                 weight: document.getElementById('weight-display').textContent,
                 quantity: 1,
@@ -2046,142 +1994,75 @@
         }
 
         async function checkout() {
-            console.log('🛒 開始結帳流程...');
-            
-            // === 1. 驗證購物車 ===
             if (cartItems.length === 0) {
-                alert('❌ 購物車是空的\n\n請先加入商品到購物車');
-                console.error('❌ 購物車為空');
+                alert('購物車是空的！');
                 return;
             }
-            
-            console.log(`✅ 購物車有 ${cartItems.length} 個項目`);
-            
-            // === 2. UI 狀態更新 ===
+
             const checkoutBtn = document.getElementById('checkout');
-            if (!checkoutBtn) {
-                console.error('❌ 找不到 checkout 按鈕');
-                return;
-            }
-            
             const originalText = checkoutBtn.textContent;
-            checkoutBtn.disabled = true;
-            checkoutBtn.style.cursor = 'wait';
             
             try {
-                const generatedFiles = [];
-                let successCount = 0;
-                let failCount = 0;
+                checkoutBtn.textContent = `正在生成 ${cartItems.length} 個 STL...`;
+                checkoutBtn.disabled = true;
                 
-                // === 3. 遍歷購物車，為每個項目生成 STL ===
+                // 為購物車中每個物件生成 STL
                 for (let i = 0; i < cartItems.length; i++) {
                     const item = cartItems[i];
-                    checkoutBtn.textContent = `⏳ 生成中 (${i + 1}/${cartItems.length})...`;
+                    checkoutBtn.textContent = `正在生成 ${i + 1}/${cartItems.length}...`;
                     
-                    console.log(`\n📦 處理項目 ${i + 1}/${cartItems.length}:`, item);
+                    const params = {
+                        letter1: item.letter1,
+                        letter2: item.letter2,
+                        font1: item.font1,
+                        font2: item.font2,
+                        size: parseInt(item.size),
+                        bailX: parseFloat(item.bailX || 0),
+                        bailY: parseFloat(item.bailY || 0),
+                        bailZ: parseFloat(item.bailZ || 0),
+                        bailRotation: parseFloat(item.bailRotation || 0)
+                    };
                     
-                    try {
-                        // 準備參數
-                        const params = {
-                            letter1: item.letter1,
-                            letter2: item.letter2,
-                            font1: item.font1,
-                            font2: item.font2,
-                            size: item.size,
-                            bailX: item.bailX,
-                            bailY: item.bailY,
-                            bailZ: item.bailZ,
-                            bailRotation: item.bailRotation
-                        };
-                        
-                        console.log('📤 發送參數到後端:', params);
-                        
-                        // 呼叫後端 API
-                        const response = await fetch(`${BACKEND_URL}/generate`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/octet-stream'
-                            },
-                            body: JSON.stringify(params),
-                            mode: 'cors'
-                        });
-                        
-                        console.log('📡 後端回應狀態:', response.status);
-                        
-                        if (!response.ok) {
-                            throw new Error(`後端回應錯誤: ${response.status}`);
-                        }
-                        
-                        // 下載 STL 檔案
-                        const blob = await response.blob();
-                        console.log('📦 STL 大小:', (blob.size / 1024).toFixed(2), 'KB');
-                        
-                        if (blob.size === 0) {
-                            throw new Error('生成的 STL 檔案為空');
-                        }
-                        
-                        // 建立下載連結
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `DUET_${params.letter1}${params.letter2}_${params.size}mm_${item.id}.stl`;
-                        
-                        // 觸發下載
-                        document.body.appendChild(a);
-                        a.click();
-                        
-                        // 清理
-                        setTimeout(() => {
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }, 100);
-                        
-                        generatedFiles.push(a.download);
-                        successCount++;
-                        console.log(`✅ 項目 ${i + 1} 成功:`, a.download);
-                        
-                        // 避免請求過快，稍微延遲
-                        if (i < cartItems.length - 1) {
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                        }
-                        
-                    } catch (error) {
-                        failCount++;
-                        console.error(`❌ 項目 ${i + 1} 失敗:`, error);
-                        // 繼續處理下一個項目
-                    }
+                    const response = await fetch(`${BACKEND_URL}/generate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/octet-stream'
+                        },
+                        body: JSON.stringify(params),
+                        mode: 'cors'
+                    });
+                    
+                    if (!response.ok) throw new Error('生成失敗');
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `DUET_${params.letter1}${params.letter2}_${params.size}mm_${Date.now()}.stl`;
+                    
+                    document.body.appendChild(a);
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+                    
+                    // 延遲避免瀏覽器阻擋
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
-                // === 4. 顯示結果 ===
-                let message = `✅ 結帳完成！\n\n`;
-                message += `成功生成: ${successCount} 個\n`;
-                if (failCount > 0) {
-                    message += `失敗: ${failCount} 個\n`;
-                }
-                message += `\n已下載檔案:\n`;
-                generatedFiles.forEach((file, idx) => {
-                    message += `${idx + 1}. ${file}\n`;
-                });
-                
-                alert(message);
-                
-                // === 5. 清空購物車 ===
+                alert(`✅ ${cartItems.length} 個 STL 檔案已生成並下載！`);
                 cartItems = [];
+                updateCartDisplay();
                 closeCart();
-                console.log('🛒 購物車已清空');
                 
             } catch (error) {
-                console.error('❌ 結帳流程錯誤:', error);
-                alert(`❌ 結帳失敗\n\n${error.message}`);
+                alert(`❌ STL 生成失敗\n${error.message}`);
             } finally {
-                // === 6. 恢復按鈕狀態 ===
-                if (checkoutBtn) {
-                    checkoutBtn.textContent = originalText;
-                    checkoutBtn.disabled = false;
-                    checkoutBtn.style.cursor = 'pointer';
-                }
-                console.log('🔄 按鈕狀態已恢復');
+                checkoutBtn.textContent = originalText;
+                checkoutBtn.disabled = false;
             }
         }
 
@@ -2205,7 +2086,7 @@
             document.getElementById('close-modal').addEventListener('click', closeFontSelector);
             document.getElementById('confirm-btn').addEventListener('click', confirmFontSelection);
 
-            ['size', 'material', 'finish'].forEach(id => {
+            ['letter1', 'letter2', 'size', 'material', 'finish'].forEach(id => {
                 document.getElementById(id).addEventListener('change', () => {
                     generateModel();
                 });
