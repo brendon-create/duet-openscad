@@ -50,20 +50,21 @@ pos_z = {pos_z};
 bail_rotation = {bail_rotation_deg};
 
 module letter_geometry(char, font_name, target_h) {{
-    // 先 extrude 成 3D，再 resize 整個 3D 物件
-    rotate([90, 0, 0])
-        resize([0, 0, target_h], auto=true)  // Z 軸是高度
-            linear_extrude(height=depth, center=true)
-                text(char, font=font_name, halign="center", valign="center");
+    resize([0, target_h, 0], auto=true)
+        text(char, font=font_name, halign="center", valign="center");
 }}
 
 module letter1_shape() {{
-    letter_geometry(letter1, font1, target_height);
+    rotate([90, 0, 0])
+        linear_extrude(height=depth, center=true)
+            letter_geometry(letter1, font1, target_height);
 }}
 
 module letter2_shape() {{
     rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
-        letter_geometry(letter2, font2, target_height);
+        rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
+            linear_extrude(height=depth, center=true)
+                letter_geometry(letter2, font2, target_height);
 }}
 
 module bail() {{
