@@ -49,22 +49,19 @@ pos_y = {pos_y};
 pos_z = {pos_z};
 bail_rotation = {bail_rotation_deg};
 
-module letter_geometry(char, font_name, target_h) {{
-    resize([0, target_h, 0], auto=true)
-        text(char, font=font_name, halign="center", valign="center");
-}}
-
 module letter1_shape() {{
     rotate([90, 0, 0])
-        linear_extrude(height=depth, center=true)
-            letter_geometry(letter1, font1, target_height);
+        resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
+            linear_extrude(height=depth, center=true)
+                text(letter1, font=font1, halign="center", valign="center");
 }}
 
 module letter2_shape() {{
     rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
         rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
-            linear_extrude(height=depth, center=true)
-                letter_geometry(letter2, font2, target_height);
+            resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
+                linear_extrude(height=depth, center=true)
+                    text(letter2, font=font2, halign="center", valign="center");
 }}
 
 module bail() {{
