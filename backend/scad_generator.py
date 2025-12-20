@@ -21,9 +21,14 @@ def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, ba
     bail_radius = 1.85
     bail_tube = 0.35
     
+    # 使用固定 text size，然後等比縮放（模仿前端邏輯）
+    text_base_size = 10.0
+    scale_factor = size / text_base_size  # 15 / 10 = 1.5
+    
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
+    logger.info(f"📐 縮放參數: text_base_size={text_base_size}, scale_factor={scale_factor}")
     
     # 墜頭位置 = 主體中心 + 相對向量
     # 在 OpenSCAD 中，主體使用 halign="center", valign="center"，所以中心點在原點 (0, 0, 0)
@@ -42,6 +47,8 @@ font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};
 depth = {depth};
+text_base_size = {text_base_size};
+scale_factor = {scale_factor};
 bail_radius = {bail_radius};
 bail_tube = {bail_tube};
 pos_x = {pos_x};
@@ -51,17 +58,17 @@ bail_rotation = {bail_rotation_deg};
 
 module letter1_shape() {{
     rotate([90, 0, 0])
-        resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
+        scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
             linear_extrude(height=depth, center=true)
-                text(letter1, font=font1, halign="center", valign="center");
+                text(letter1, font=font1, size=text_base_size, halign="center", valign="center");
 }}
 
 module letter2_shape() {{
     rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
         rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
-            resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
+            scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
                 linear_extrude(height=depth, center=true)
-                    text(letter2, font=font2, halign="center", valign="center");
+                    text(letter2, font=font2, size=text_base_size, halign="center", valign="center");
 }}
 
 module bail() {{
