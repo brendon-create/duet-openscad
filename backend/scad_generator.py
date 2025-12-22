@@ -27,12 +27,21 @@ def generate_scad_script(letter1, letter2, font1, font2, size,
     
     import logging
     logger = logging.getLogger(__name__)
+    logger.info(f"════════════════════════════════════════")
     logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
     logger.info(f"🔧 收到絕對座標: X={bailAbsoluteX}, Y={bailAbsoluteY}, Z={bailAbsoluteZ}")
-    logger.info(f"📐 Letter1 BBox: W={letter1Width}, H={letter1Height}, D={letter1Depth}")
-    logger.info(f"📐 Letter1 Offset: X={letter1OffsetX}, Y={letter1OffsetY}, Z={letter1OffsetZ}")
-    logger.info(f"📐 Letter2 BBox: W={letter2Width}, H={letter2Height}, D={letter2Depth}")
-    logger.info(f"📐 Letter2 Offset: X={letter2OffsetX}, Y={letter2OffsetY}, Z={letter2OffsetZ}")
+    logger.info(f"📐 後端將使用以下尺寸生成模型:")
+    logger.info(f"   Letter1 (前端傳入): W={letter1Width:.3f}mm, H={letter1Height:.3f}mm, D={letter1Depth:.3f}mm")
+    logger.info(f"   Letter1 Offset: X={letter1OffsetX:.3f}, Y={letter1OffsetY:.3f}, Z={letter1OffsetZ:.3f}")
+    logger.info(f"   Letter2 (前端傳入): W={letter2Width:.3f}mm, H={letter2Height:.3f}mm, D={letter2Depth:.3f}mm")
+    logger.info(f"   Letter2 Offset: X={letter2OffsetX:.3f}, Y={letter2OffsetY:.3f}, Z={letter2OffsetZ:.3f}")
+    logger.info(f"   Target Height: {size}mm")
+    logger.info(f"   Extrude Depth: {depth}mm")
+    logger.info(f"📏 測量 STL 實際尺寸方法:")
+    logger.info(f"   1. 用 MeshLab 或其他工具開啟 STL")
+    logger.info(f"   2. 查看 BBox 或使用測量工具")
+    logger.info(f"   3. 對比前端 Console 輸出的最終尺寸")
+    logger.info(f"════════════════════════════════════════")
     
     # 使用絕對座標定位墜頭
     pos_x = bailAbsoluteX
@@ -42,6 +51,18 @@ def generate_scad_script(letter1, letter2, font1, font2, size,
     bail_rotation_deg = bailRotation + 90
     
     scad_script = f'''// DUET Absolute BBox Sync System
+// 
+// 📏 預期生成尺寸（用於對比 STL 實際尺寸）:
+//    Letter1: W={letter1Width:.3f}mm, H={letter1Height:.3f}mm, D={letter1Depth:.3f}mm
+//    Letter2: W={letter2Width:.3f}mm, H={letter2Height:.3f}mm, D={letter2Depth:.3f}mm
+//    Target Height: {size}mm
+//    Extrude Depth: {depth}mm
+//
+// 測量方法:
+//    1. 用 MeshLab 開啟生成的 STL
+//    2. 查看 Render > Show Box Corners 或使用測量工具
+//    3. 對比前端 Console 輸出的 "前端 Model 最終實際尺寸"
+//
 $fn = {fn};
 
 letter1 = "{letter1}";
