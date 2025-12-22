@@ -1,5 +1,6 @@
 def generate_scad_script(letter1, letter2, font1, font2, size, 
                         bailRelativeX, bailRelativeY, bailRelativeZ, bailRotation,
+                        bailAbsoluteX, bailAbsoluteY, bailAbsoluteZ,
                         letter1Width, letter1Height, letter1Depth,
                         letter1OffsetX, letter1OffsetY, letter1OffsetZ,
                         letter2Width, letter2Height, letter2Depth,
@@ -21,21 +22,22 @@ def generate_scad_script(letter1, letter2, font1, font2, size,
         fn = 48
     
     depth = size * 5.0
-    bail_radius = 1.85
-    bail_tube = 0.35
+    bail_radius = 1.85  # innerRadius + tubeRadius = 1.5 + 0.35
+    bail_tube = 0.35    # 管半徑 0.35mm，直徑 0.7mm
     
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
+    logger.info(f"🔧 收到絕對座標: X={bailAbsoluteX}, Y={bailAbsoluteY}, Z={bailAbsoluteZ}")
     logger.info(f"📐 Letter1 BBox: W={letter1Width}, H={letter1Height}, D={letter1Depth}")
     logger.info(f"📐 Letter1 Offset: X={letter1OffsetX}, Y={letter1OffsetY}, Z={letter1OffsetZ}")
     logger.info(f"📐 Letter2 BBox: W={letter2Width}, H={letter2Height}, D={letter2Depth}")
     logger.info(f"📐 Letter2 Offset: X={letter2OffsetX}, Y={letter2OffsetY}, Z={letter2OffsetZ}")
     
-    # 墜頭位置 = 主體中心 + 相對向量
-    pos_x = 0 + bailRelativeX
-    pos_y = 0 + bailRelativeY
-    pos_z = 0 + bailRelativeZ
+    # 使用絕對座標定位墜頭
+    pos_x = bailAbsoluteX
+    pos_y = bailAbsoluteY
+    pos_z = bailAbsoluteZ
     # 前端墜頭有初始 90° 旋轉
     bail_rotation_deg = bailRotation + 90
     

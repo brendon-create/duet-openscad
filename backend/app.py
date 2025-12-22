@@ -171,6 +171,13 @@ def generate_stl():
         
         logger.info(f"Bail params: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
         
+        # Bail absolute coordinates for precise positioning
+        bailAbsoluteX = data.get('bailAbsoluteX', 0)
+        bailAbsoluteY = data.get('bailAbsoluteY', 0)
+        bailAbsoluteZ = data.get('bailAbsoluteZ', 0)
+        
+        logger.info(f"🔍 Bail absolute position: X={bailAbsoluteX}, Y={bailAbsoluteY}, Z={bailAbsoluteZ}")
+        
         # BBox parameters for absolute dimension sync
         letter1Width = data.get('letter1Width', 0)
         letter1Height = data.get('letter1Height', 0)
@@ -202,6 +209,9 @@ def generate_stl():
             bailRelativeY=bailRelativeY,
             bailRelativeZ=bailRelativeZ,
             bailRotation=bailRotation,
+            bailAbsoluteX=bailAbsoluteX,
+            bailAbsoluteY=bailAbsoluteY,
+            bailAbsoluteZ=bailAbsoluteZ,
             letter1Width=letter1Width,
             letter1Height=letter1Height,
             letter1Depth=letter1Depth,
