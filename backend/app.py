@@ -171,6 +171,24 @@ def generate_stl():
         
         logger.info(f"Bail params: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
         
+        # BBox parameters for absolute dimension sync
+        letter1Width = data.get('letter1Width', 0)
+        letter1Height = data.get('letter1Height', 0)
+        letter1Depth = data.get('letter1Depth', 0)
+        letter1OffsetX = data.get('letter1OffsetX', 0)
+        letter1OffsetY = data.get('letter1OffsetY', 0)
+        letter1OffsetZ = data.get('letter1OffsetZ', 0)
+        
+        letter2Width = data.get('letter2Width', 0)
+        letter2Height = data.get('letter2Height', 0)
+        letter2Depth = data.get('letter2Depth', 0)
+        letter2OffsetX = data.get('letter2OffsetX', 0)
+        letter2OffsetY = data.get('letter2OffsetY', 0)
+        letter2OffsetZ = data.get('letter2OffsetZ', 0)
+        
+        logger.info(f"Letter1 BBox: W={letter1Width}, H={letter1Height}, D={letter1Depth}")
+        logger.info(f"Letter2 BBox: W={letter2Width}, H={letter2Height}, D={letter2Depth}")
+        
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
@@ -183,7 +201,19 @@ def generate_stl():
             bailRelativeX=bailRelativeX,
             bailRelativeY=bailRelativeY,
             bailRelativeZ=bailRelativeZ,
-            bailRotation=bailRotation
+            bailRotation=bailRotation,
+            letter1Width=letter1Width,
+            letter1Height=letter1Height,
+            letter1Depth=letter1Depth,
+            letter1OffsetX=letter1OffsetX,
+            letter1OffsetY=letter1OffsetY,
+            letter1OffsetZ=letter1OffsetZ,
+            letter2Width=letter2Width,
+            letter2Height=letter2Height,
+            letter2Depth=letter2Depth,
+            letter2OffsetX=letter2OffsetX,
+            letter2OffsetY=letter2OffsetY,
+            letter2OffsetZ=letter2OffsetZ
         )
         
         if 'rotate([0, 0, 90])' in scad_content:

@@ -1,13 +1,16 @@
-def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, bailRelativeY, bailRelativeZ, bailRotation):
+def generate_scad_script(letter1, letter2, font1, font2, size, 
+                        bailRelativeX, bailRelativeY, bailRelativeZ, bailRotation,
+                        letter1Width, letter1Height, letter1Depth,
+                        letter1OffsetX, letter1OffsetY, letter1OffsetZ,
+                        letter2Width, letter2Height, letter2Depth,
+                        letter2OffsetX, letter2OffsetY, letter2OffsetZ):
     """
-    生成與前端 Z-Up 系統完全一致的 OpenSCAD 腳本
+    使用絕對尺寸同步法 (Absolute BBox Sync)
     
     關鍵修正：
-    1. Letter 2 旋轉順序匹配前端
-    2. 使用相對向量定位墜頭：墜頭位置 = 主體中心 + 相對向量
-    3. 使用 resize() 確保精確高度
-    4. union() 確保無破面
-    5. 字體名稱由後端嚴格驗證，直接使用
+    1. 前端傳遞精確的 BBox 尺寸和偏移量
+    2. 後端使用 resize() 強制達到相同的絕對尺寸
+    3. 使用 translate() 模擬 geo.center() 的效果
     """
     
     if size <= 20:
@@ -21,24 +24,22 @@ def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, ba
     bail_radius = 1.85
     bail_tube = 0.35
     
-    # 使用固定 text size，然後等比縮放（模仿前端邏輯）
-    text_base_size = 10.0
-    scale_factor = size / text_base_size  # 15 / 10 = 1.5
-    
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
-    logger.info(f"📐 縮放參數: text_base_size={text_base_size}, scale_factor={scale_factor}")
+    logger.info(f"📐 Letter1 BBox: W={letter1Width}, H={letter1Height}, D={letter1Depth}")
+    logger.info(f"📐 Letter1 Offset: X={letter1OffsetX}, Y={letter1OffsetY}, Z={letter1OffsetZ}")
+    logger.info(f"📐 Letter2 BBox: W={letter2Width}, H={letter2Height}, D={letter2Depth}")
+    logger.info(f"📐 Letter2 Offset: X={letter2OffsetX}, Y={letter2OffsetY}, Z={letter2OffsetZ}")
     
     # 墜頭位置 = 主體中心 + 相對向量
-    # 在 OpenSCAD 中，主體使用 halign="center", valign="center"，所以中心點在原點 (0, 0, 0)
     pos_x = 0 + bailRelativeX
     pos_y = 0 + bailRelativeY
     pos_z = 0 + bailRelativeZ
-    # 前端墜頭有初始 90° 旋轉（geometry.rotateZ(Math.PI/2)），後端需要加上這個偏移
+    # 前端墜頭有初始 90° 旋轉
     bail_rotation_deg = bailRotation + 90
     
-    scad_script = f'''// DUET Z-Up System
+    scad_script = f'''// DUET Absolute BBox Sync System
 $fn = {fn};
 
 letter1 = "{letter1}";
@@ -47,8 +48,24 @@ font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};
 depth = {depth};
-text_base_size = {text_base_size};
-scale_factor = {scale_factor};
+
+// Letter 1 BBox (前端測量的絕對尺寸)
+letter1_width = {letter1Width};
+letter1_height = {letter1Height};
+letter1_depth = {letter1Depth};
+letter1_offset_x = {letter1OffsetX};
+letter1_offset_y = {letter1OffsetY};
+letter1_offset_z = {letter1OffsetZ};
+
+// Letter 2 BBox
+letter2_width = {letter2Width};
+letter2_height = {letter2Height};
+letter2_depth = {letter2Depth};
+letter2_offset_x = {letter2OffsetX};
+letter2_offset_y = {letter2OffsetY};
+letter2_offset_z = {letter2OffsetZ};
+
+// 墜頭
 bail_radius = {bail_radius};
 bail_tube = {bail_tube};
 pos_x = {pos_x};
@@ -58,22 +75,24 @@ bail_rotation = {bail_rotation_deg};
 
 module letter1_shape() {{
     rotate([90, 0, 0])
-        scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
-            linear_extrude(height=depth, center=true)
-                text(letter1, font=font1, size=text_base_size, halign="center", valign="center");
+        linear_extrude(height=depth, center=true)
+            resize([letter1_width, letter1_height, 0], auto=false)  // 強制絕對尺寸
+                translate([-letter1_offset_x, -letter1_offset_y, 0])  // 模擬 center()
+                    text(letter1, font=font1, size=10, halign="left", valign="bottom");
 }}
 
 module letter2_shape() {{
     rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
         rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
-            scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
-                linear_extrude(height=depth, center=true)
-                    text(letter2, font=font2, size=text_base_size, halign="center", valign="center");
+            linear_extrude(height=depth, center=true)
+                resize([letter2_width, letter2_height, 0], auto=false)  // 強制絕對尺寸
+                    translate([-letter2_offset_x, -letter2_offset_y, 0])  // 模擬 center()
+                        text(letter2, font=font2, size=10, halign="left", valign="bottom");
 }}
 
 module bail() {{
     translate([pos_x, pos_y, pos_z])
-        rotate([0, 0, bail_rotation])  // 用戶旋轉
+        rotate([0, 0, bail_rotation])
             rotate([90, 0, 0])
                 rotate_extrude(angle=360, $fn=32)
                     translate([bail_radius, 0, 0])
