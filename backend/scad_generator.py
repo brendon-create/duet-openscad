@@ -80,7 +80,7 @@ module letter1_shape() {{
         linear_extrude(height=depth, center=true)
             resize([letter1_width, letter1_height, 0], auto=false)  // 強制絕對尺寸
                 translate([-letter1_offset_x, -letter1_offset_y, 0])  // 模擬 center()
-                    text(letter1, font=font1, size=10, halign="left", valign="bottom");
+                    text(letter1, font=font1, size=10, halign="center", valign="center");
 }}
 
 module letter2_shape() {{
@@ -89,7 +89,7 @@ module letter2_shape() {{
             linear_extrude(height=depth, center=true)
                 resize([letter2_width, letter2_height, 0], auto=false)  // 強制絕對尺寸
                     translate([-letter2_offset_x, -letter2_offset_y, 0])  // 模擬 center()
-                        text(letter2, font=font2, size=10, halign="left", valign="bottom");
+                        text(letter2, font=font2, size=10, halign="center", valign="center");
 }}
 
 module bail() {{
