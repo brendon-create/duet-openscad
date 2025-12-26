@@ -1,9 +1,9 @@
 """
-DUET Backend - 帶隊列系統的版本
-包含：STL 生成、綠界金流、Email 發送、異步 STL 處理
+DUET Backend - 完整版（使用 Resend Email）
+包含：STL 生成、綠界金流、Resend Email、隊列系統
 """
 
-from flask import Flask, request, jsonify, send_file, redirect
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import subprocess
@@ -14,13 +14,10 @@ import hashlib
 import urllib.parse
 from datetime import datetime
 import json
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
+import resend
 import threading
 import time
+import base64
 
 # ==========================================
 # Flask 應用初始化
@@ -39,7 +36,7 @@ TEMP_DIR = tempfile.gettempdir()
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 # ==========================================
-# 配置區塊
+# 配置
 # ==========================================
 
 # 綠界配置
@@ -50,20 +47,19 @@ ECPAY_CONFIG = {
     'PaymentURL': 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
 }
 
-# Email 配置
-EMAIL_CONFIG = {
-    'smtp_server': 'smtp.gmail.com',
-    'smtp_port': 587,
-    'sender_email': 'service@brendonchen.com',
-    'sender_password': 'ptja xltm uoeh basi',  # ← 更新這裡
-    'sender_name': 'DUET 客製珠寶',
-    'internal_email': 'brendon@brendonchen.com'
-}
+# Resend Email 配置
+RESEND_API_KEY = 're_Vy8zWUJ2_KhUfFBXD5qiPEVPPsLAghgGr'
+SENDER_EMAIL = 'onboarding@resend.dev'  # 測試用，之後改成 service@brendonchen.com
+SENDER_NAME = 'DUET 客製珠寶'
+INTERNAL_EMAIL = 'brendon@brendonchen.com'
+
+# 設定 Resend API Key
+resend.api_key = RESEND_API_KEY
 
 # 目錄配置
 ORDERS_DIR = 'orders'
 STL_DIR = 'stl_files'
-QUEUE_DIR = 'stl_queue'  # 新增：STL 生成隊列
+QUEUE_DIR = 'stl_queue'
 os.makedirs(ORDERS_DIR, exist_ok=True)
 os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
@@ -72,12 +68,12 @@ os.makedirs(QUEUE_DIR, exist_ok=True)
 # 隊列系統
 # ==========================================
 
-def add_to_stl_queue(order_id, retry_count=0):
-    """將訂單加入 STL 生成隊列"""
+def add_to_stl_queue(order_id):
+    """加入 STL 生成隊列"""
     queue_item = {
         'order_id': order_id,
         'added_at': datetime.now().isoformat(),
-        'retry_count': retry_count,
+        'retry_count': 0,
         'status': 'pending'
     }
     
@@ -85,7 +81,7 @@ def add_to_stl_queue(order_id, retry_count=0):
     with open(queue_file, 'w', encoding='utf-8') as f:
         json.dump(queue_item, f, ensure_ascii=False, indent=2)
     
-    logger.info(f"✅ 訂單 {order_id} 已加入 STL 生成隊列")
+    logger.info(f"✅ 訂單 {order_id} 已加入 STL 隊列")
 
 def get_pending_queue_items():
     """取得待處理的隊列項目"""
@@ -99,73 +95,61 @@ def get_pending_queue_items():
                         item = json.load(f)
                         if item.get('status') == 'pending':
                             items.append((filepath, item))
-                except Exception as e:
-                    logger.error(f"讀取隊列項目錯誤 {filename}: {e}")
-    except Exception as e:
-        logger.error(f"讀取隊列目錄錯誤: {e}")
-    
+                except:
+                    pass
+    except:
+        pass
     return items
 
 def remove_from_queue(queue_file):
-    """從隊列移除項目"""
+    """從隊列移除"""
     try:
         os.unlink(queue_file)
-        logger.info(f"✅ 已從隊列移除: {queue_file}")
-    except Exception as e:
-        logger.error(f"移除隊列項目錯誤: {e}")
+        logger.info(f"✅ 已從隊列移除")
+    except:
+        pass
 
 def process_stl_queue():
-    """處理 STL 生成隊列（背景執行）"""
-    logger.info("🔄 開始處理 STL 隊列...")
-    
+    """處理 STL 隊列"""
     items = get_pending_queue_items()
     
     if not items:
-        logger.info("📭 隊列為空")
         return
     
     logger.info(f"📋 隊列中有 {len(items)} 個待處理項目")
     
-    # 每次只處理一個，避免記憶體問題
+    # 每次處理一個
     queue_file, item = items[0]
     order_id = item['order_id']
     retry_count = item.get('retry_count', 0)
     
-    logger.info(f"🔨 處理訂單: {order_id} (重試次數: {retry_count})")
+    logger.info(f"🔨 處理訂單: {order_id}")
     
     try:
-        # 生成 STL 並發送 Email
         success = generate_and_send_stl(order_id)
         
         if success:
-            # 成功：從隊列移除
             remove_from_queue(queue_file)
             update_order_status(order_id, 'completed')
             logger.info(f"✅ 訂單 {order_id} 處理完成")
         else:
-            # 失敗：重試或通知
             if retry_count < 3:
-                # 更新重試次數
                 item['retry_count'] = retry_count + 1
-                item['last_retry'] = datetime.now().isoformat()
                 with open(queue_file, 'w', encoding='utf-8') as f:
                     json.dump(item, f, ensure_ascii=False, indent=2)
-                logger.warning(f"⚠️ 訂單 {order_id} 處理失敗，將重試 ({retry_count + 1}/3)")
+                logger.warning(f"⚠️ 訂單 {order_id} 失敗，將重試 ({retry_count + 1}/3)")
             else:
-                # 重試 3 次後仍失敗
                 item['status'] = 'failed'
                 with open(queue_file, 'w', encoding='utf-8') as f:
                     json.dump(item, f, ensure_ascii=False, indent=2)
                 update_order_status(order_id, 'stl_failed')
-                send_admin_alert(order_id, "STL 生成失敗，已重試 3 次")
-                logger.error(f"❌ 訂單 {order_id} 處理失敗，已重試 3 次")
+                logger.error(f"❌ 訂單 {order_id} 重試 3 次後失敗")
                 
     except Exception as e:
-        logger.error(f"❌ 處理隊列項目時發生錯誤: {str(e)}")
-        # 不移除，下次再試
+        logger.error(f"❌ 處理錯誤: {str(e)}")
 
 def stl_queue_worker():
-    """背景 Worker：定期處理隊列"""
+    """背景 Worker"""
     logger.info("🚀 STL Queue Worker 已啟動")
     
     while True:
@@ -174,26 +158,23 @@ def stl_queue_worker():
         except Exception as e:
             logger.error(f"Worker 錯誤: {str(e)}")
         
-        # 每 60 秒檢查一次
         time.sleep(60)
 
-# 啟動背景 Worker
 def start_background_worker():
-    """在背景線程啟動 Worker"""
+    """啟動背景 Worker"""
     worker_thread = threading.Thread(target=stl_queue_worker, daemon=True)
     worker_thread.start()
     logger.info("✅ 背景 Worker 已啟動")
 
 # ==========================================
-# STL 生成和發送
+# STL 生成
 # ==========================================
 
 def generate_stl_for_item(item):
-    """為單個商品生成 STL"""
+    """生成 STL"""
     try:
         logger.info(f"🔨 生成 STL: {item['letter1']}{item['letter2']}")
         
-        # 準備參數
         params = {
             'letter1': item['letter1'],
             'letter2': item['letter2'],
@@ -221,51 +202,34 @@ def generate_stl_for_item(item):
             'letter2OffsetZ': item.get('letter2BBox', {}).get('offsetZ', 0)
         }
         
-        # 生成 SCAD 腳本
         scad_content = generate_scad_script(**params)
         
-        # 寫入臨時檔案
         with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
             scad_file.write(scad_content)
             scad_path = scad_file.name
         
-        # 生成 STL
         stl_path = scad_path.replace('.scad', '.stl')
         
-        cmd = [
-            'openscad',
-            '-o', stl_path,
-            '--export-format', 'binstl',
-            scad_path
-        ]
+        cmd = ['openscad', '-o', stl_path, '--export-format', 'binstl', scad_path]
         
         env = os.environ.copy()
         env['DISPLAY'] = ':99'
         
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            env=env
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
         
-        # 清理 SCAD 檔案
         try:
             os.unlink(scad_path)
         except:
             pass
         
         if result.returncode != 0 or not os.path.exists(stl_path):
-            logger.error(f"❌ STL 生成失敗: {result.stderr}")
+            logger.error(f"❌ STL 生成失敗")
             return None
         
-        # 複製到永久目錄
         final_path = os.path.join(STL_DIR, f"{item['id']}.stl")
         import shutil
         shutil.copy(stl_path, final_path)
         
-        # 清理臨時 STL
         try:
             os.unlink(stl_path)
         except:
@@ -279,7 +243,7 @@ def generate_stl_for_item(item):
         return None
 
 def generate_and_send_stl(order_id):
-    """生成訂單的所有 STL 並發送 Email"""
+    """生成所有 STL 並發送內部 Email-2"""
     try:
         order = load_order(order_id)
         if not order:
@@ -293,11 +257,10 @@ def generate_and_send_stl(order_id):
             if stl_path:
                 stl_files.append(stl_path)
             else:
-                logger.error(f"❌ 項目 {item.get('id')} 的 STL 生成失敗")
                 return False
         
-        # 發送帶 STL 的 Email
-        email_sent = send_stl_email(order, stl_files)
+        # 發送內部 Email-2（帶 STL）
+        email_sent = send_internal_stl_email(order, stl_files)
         
         return email_sent
         
@@ -306,22 +269,280 @@ def generate_and_send_stl(order_id):
         return False
 
 # ==========================================
+# 訂單管理
+# ==========================================
+
+def save_order(order_id, order_data):
+    """儲存訂單"""
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(order_data, f, ensure_ascii=False, indent=2)
+    logger.info(f"✅ 訂單已儲存: {order_id}")
+
+def load_order(order_id):
+    """讀取訂單"""
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
+    if not os.path.exists(filepath):
+        return None
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def update_order_status(order_id, status, payment_data=None):
+    """更新訂單狀態"""
+    order = load_order(order_id)
+    if not order:
+        return False
+    order['status'] = status
+    order['updated_at'] = datetime.now().isoformat()
+    if payment_data:
+        order['payment_data'] = payment_data
+    save_order(order_id, order)
+    logger.info(f"📝 訂單狀態: {order_id} → {status}")
+    return True
+
+# ==========================================
+# Email 系統（使用 Resend）
+# ==========================================
+
+def send_customer_confirmation_email(order_data):
+    """Email 1: 給顧客的確認 Email"""
+    try:
+        customer_email = order_data['userInfo']['email']
+        logger.info(f"📧 發送顧客確認 Email: {customer_email}")
+        
+        html = generate_customer_email_html(order_data)
+        
+        params = {
+            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
+            "to": [customer_email],
+            "subject": f"訂單確認 - {order_data['orderId']}",
+            "html": html
+        }
+        
+        email = resend.Emails.send(params)
+        logger.info(f"✅ 顧客確認 Email 已發送: {email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ 顧客 Email 發送失敗: {str(e)}")
+        return False
+
+def send_internal_order_email(order_data):
+    """Email 2: 給內部的訂單通知（無 STL）"""
+    try:
+        logger.info(f"📧 發送內部訂單通知")
+        
+        html = generate_internal_order_email_html(order_data)
+        
+        params = {
+            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
+            "to": [INTERNAL_EMAIL],
+            "subject": f"新訂單 - {order_data['orderId']}",
+            "html": html
+        }
+        
+        email = resend.Emails.send(params)
+        logger.info(f"✅ 內部訂單 Email 已發送: {email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ 內部訂單 Email 發送失敗: {str(e)}")
+        return False
+
+def send_internal_stl_email(order_data, stl_files):
+    """Email 3: 給內部的 STL 完成通知（帶 STL）"""
+    try:
+        logger.info(f"📧 發送內部 STL Email")
+        
+        html = generate_internal_stl_email_html(order_data)
+        
+        # 準備附件
+        attachments = []
+        for stl_path in stl_files:
+            if os.path.exists(stl_path):
+                filename = os.path.basename(stl_path)
+                with open(stl_path, 'rb') as f:
+                    content = base64.b64encode(f.read()).decode()
+                    attachments.append({
+                        "filename": filename,
+                        "content": content
+                    })
+                logger.info(f"📎 附加: {filename}")
+        
+        params = {
+            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
+            "to": [INTERNAL_EMAIL],
+            "subject": f"STL 已完成 - {order_data['orderId']}",
+            "html": html,
+            "attachments": attachments
+        }
+        
+        email = resend.Emails.send(params)
+        logger.info(f"✅ 內部 STL Email 已發送: {email}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ 內部 STL Email 發送失敗: {str(e)}")
+        return False
+
+# ==========================================
+# Email HTML 模板
+# ==========================================
+
+def generate_customer_email_html(order_data):
+    """顧客確認 Email HTML"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        items_html += f'''
+        <tr>
+            <td>{idx}</td>
+            <td>{item['letter1']} + {item['letter2']}</td>
+            <td>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</td>
+            <td>{item.get('size', 'N/A')} mm</td>
+            <td>{item.get('material', 'N/A')}</td>
+            <td>{item.get('quantity', 1)}</td>
+        </tr>
+        '''
+    
+    html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
+        th {{ background: #f5f5f5; }}
+    </style></head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>✅ 訂單確認</h1>
+                <p>訂單編號: {order_data['orderId']}</p>
+            </div>
+            <p>親愛的 {order_data['userInfo']['name']}，</p>
+            <p>感謝您的訂購！我們已收到您的訂單。</p>
+            <h3>訂購項目</h3>
+            <table>
+                <tr>
+                    <th>#</th>
+                    <th>字母</th>
+                    <th>字體</th>
+                    <th>尺寸</th>
+                    <th>材質</th>
+                    <th>數量</th>
+                </tr>
+                {items_html}
+            </table>
+            <p><strong>訂單金額：NT$ {order_data['total']:,}</strong></p>
+            <p>我們將盡快為您製作實體產品。</p>
+            <p>DUET 客製珠寶 敬上</p>
+            <p style="color: #666; font-size: 12px;">此郵件由系統自動發送</p>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
+
+def generate_internal_order_email_html(order_data):
+    """內部訂單通知 Email HTML"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        bbox1 = item.get('letter1BBox', {})
+        bbox2 = item.get('letter2BBox', {})
+        items_html += f'''
+        <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
+            <h3>項目 {idx}</h3>
+            <p><strong>字母：</strong>{item['letter1']} + {item['letter2']}</p>
+            <p><strong>字體：</strong>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</p>
+            <p><strong>尺寸：</strong>{item.get('size', 'N/A')} mm</p>
+            <p><strong>材質：</strong>{item.get('material', 'N/A')}</p>
+            <details>
+                <summary style="cursor: pointer; color: #666;">技術參數</summary>
+                <pre style="background: #f5f5f5; padding: 10px; font-size: 12px;">
+Letter1 BBox: W={bbox1.get('width', 0):.3f}, H={bbox1.get('height', 0):.3f}, D={bbox1.get('depth', 0):.3f}
+Letter2 BBox: W={bbox2.get('width', 0):.3f}, H={bbox2.get('height', 0):.3f}, D={bbox2.get('depth', 0):.3f}
+Bail: X={item.get('bailAbsoluteX', 0):.3f}, Y={item.get('bailAbsoluteY', 0):.3f}, Z={item.get('bailAbsoluteZ', 0):.3f}
+                </pre>
+            </details>
+        </div>
+        '''
+    
+    test_warning = ''
+    if order_data.get('testMode'):
+        test_warning = '<div style="background: #fff3cd; padding: 15px; margin: 10px 0;">⚠️ 測試訂單</div>'
+    
+    html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family: Arial, sans-serif;">
+        <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+            <h1 style="background: #2c3e50; color: white; padding: 20px; text-align: center;">
+                🎉 新訂單通知
+            </h1>
+            {test_warning}
+            <h2>訂單資訊</h2>
+            <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
+            <p><strong>訂單時間：</strong>{order_data.get('timestamp', 'N/A')}</p>
+            <p><strong>訂單金額：</strong>NT$ {order_data['total']:,}</p>
+            <h2>👤 顧客資訊</h2>
+            <p><strong>姓名：</strong>{order_data['userInfo']['name']}</p>
+            <p><strong>Email：</strong>{order_data['userInfo']['email']}</p>
+            <p><strong>電話：</strong>{order_data['userInfo']['phone']}</p>
+            <h2>🎁 訂購項目</h2>
+            {items_html}
+            <p style="background: #e3f2fd; padding: 15px; margin: 20px 0;">
+                ⏳ STL 檔案製作中...
+            </p>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
+
+def generate_internal_stl_email_html(order_data):
+    """內部 STL 完成 Email HTML"""
+    items_list = '<ul>'
+    for item in order_data['items']:
+        items_list += f'<li>{item["letter1"]} + {item["letter2"]} ({item.get("size", "N/A")} mm)</li>'
+    items_list += '</ul>'
+    
+    html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"></head>
+    <body style="font-family: Arial, sans-serif;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="background: #2196F3; color: white; padding: 20px; text-align: center;">
+                ✅ STL 檔案已完成
+            </h1>
+            <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
+            <h2>📋 項目清單</h2>
+            {items_list}
+            <div style="background: #fff3cd; padding: 15px; margin: 20px 0;">
+                <p><strong>📎 附件</strong></p>
+                <p>STL 檔案已附加在此郵件中。</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+    return html
+
+# ==========================================
 # 原有的 STL 生成端點（保留）
 # ==========================================
 
 @app.route('/health', methods=['GET'])
 def health_check():
     try:
-        result = subprocess.run(['which', 'openscad'], 
-                              capture_output=True, 
-                              text=True, 
-                              timeout=5)
+        result = subprocess.run(['which', 'openscad'], capture_output=True, text=True, timeout=5)
         if result.returncode == 0:
             openscad_path = result.stdout.strip()
             version_result = subprocess.run(['openscad', '--version'], 
-                                          capture_output=True, 
-                                          text=True, 
-                                          timeout=5,
+                                          capture_output=True, text=True, timeout=5,
                                           env={'DISPLAY': ':99'})
             version_info = version_result.stdout.strip() or version_result.stderr.strip() or "Installed"
             openscad_status = f"{openscad_path} - {version_info}"
@@ -330,28 +551,21 @@ def health_check():
     except Exception as e:
         openscad_status = f"Error: {str(e)}"
     
-    # 檢查隊列狀態
     queue_items = get_pending_queue_items()
     
     return jsonify({
         'status': 'healthy',
         'openscad': openscad_status,
-        'temp_dir': TEMP_DIR,
         'payment_enabled': True,
         'email_enabled': True,
+        'email_service': 'Resend',
         'queue_system': True,
         'pending_stl_jobs': len(queue_items)
     })
 
 def get_available_fonts():
     try:
-        result = subprocess.run(
-            ['fc-list'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
+        result = subprocess.run(['fc-list'], capture_output=True, text=True, timeout=10)
         if result.returncode != 0:
             return set()
         
@@ -361,51 +575,31 @@ def get_available_fonts():
                 parts = line.split(':', 1)
                 if len(parts) >= 2:
                     font_info = parts[1].strip()
-                    
                     if ':style=' in font_info:
                         font_name = font_info.split(':style=')[0].strip()
                     else:
                         font_name = font_info.strip()
-                    
                     for name in font_name.split(','):
                         clean_name = name.strip()
                         if clean_name:
                             font_families.add(clean_name)
-        
         return font_families
-        
-    except Exception as e:
-        logger.error(f"Error getting available fonts: {e}")
+    except:
         return set()
 
 def validate_font(font_name):
-    logger.info(f"Validating font: {font_name}")
-    
     available_fonts = get_available_fonts()
-    
     if not available_fonts:
-        logger.error("Could not retrieve font list from system")
         raise ValueError("Cannot get system fonts")
-    
     if font_name not in available_fonts:
-        logger.error(f"Font '{font_name}' not found in system. Available fonts: {len(available_fonts)}")
         raise ValueError(f"Font '{font_name}' not found")
-    
-    logger.info(f"Font '{font_name}' validated successfully")
     return font_name
 
 @app.route('/list-fonts', methods=['GET'])
 def list_fonts():
     try:
-        result = subprocess.run(
-            ['fc-list'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
+        result = subprocess.run(['fc-list'], capture_output=True, text=True, timeout=10)
         if result.returncode != 0:
-            logger.error(f"fc-list failed: {result.stderr}")
             return jsonify({'error': 'Failed to list fonts'}), 500
         
         font_families = set()
@@ -414,35 +608,25 @@ def list_fonts():
                 parts = line.split(':', 1)
                 if len(parts) >= 2:
                     font_info = parts[1].strip()
-                    
                     if ':style=' in font_info:
                         font_name = font_info.split(':style=')[0].strip()
                     else:
                         font_name = font_info.strip()
-                    
                     for family in font_name.split(','):
                         clean_name = family.strip()
                         if clean_name:
                             font_families.add(clean_name)
         
         sorted_fonts = sorted(font_families)
-        logger.info(f"Found {len(sorted_fonts)} unique font families")
-        
-        return jsonify({
-            'fonts': sorted_fonts,
-            'total': len(sorted_fonts)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in list_fonts: {e}")
+        return jsonify({'fonts': sorted_fonts, 'total': len(sorted_fonts)})
+    except:
         return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/generate', methods=['POST'])
 def generate_stl():
-    """原有的即時 STL 生成端點（保留供前端預覽使用）"""
+    """原有的即時 STL 生成端點"""
     try:
         data = request.json
-        logger.info(f"Received request: {data}")
         
         letter1 = data.get('letter1', 'D')
         letter2 = data.get('letter2', 'T')
@@ -489,29 +673,13 @@ def generate_stl():
         font2 = validate_font(font2)
         
         scad_content = generate_scad_script(
-            letter1=letter1,
-            letter2=letter2,
-            font1=font1,
-            font2=font2,
-            size=size,
-            bailRelativeX=bailRelativeX,
-            bailRelativeY=bailRelativeY,
-            bailRelativeZ=bailRelativeZ,
-            bailRotation=bailRotation,
-            bailAbsoluteX=bailAbsoluteX,
-            bailAbsoluteY=bailAbsoluteY,
-            bailAbsoluteZ=bailAbsoluteZ,
-            letter1Width=letter1Width,
-            letter1Height=letter1Height,
-            letter1Depth=letter1Depth,
-            letter1OffsetX=letter1OffsetX,
-            letter1OffsetY=letter1OffsetY,
-            letter1OffsetZ=letter1OffsetZ,
-            letter2Width=letter2Width,
-            letter2Height=letter2Height,
-            letter2Depth=letter2Depth,
-            letter2OffsetX=letter2OffsetX,
-            letter2OffsetY=letter2OffsetY,
+            letter1=letter1, letter2=letter2, font1=font1, font2=font2, size=size,
+            bailRelativeX=bailRelativeX, bailRelativeY=bailRelativeY, bailRelativeZ=bailRelativeZ,
+            bailRotation=bailRotation, bailAbsoluteX=bailAbsoluteX, bailAbsoluteY=bailAbsoluteY,
+            bailAbsoluteZ=bailAbsoluteZ, letter1Width=letter1Width, letter1Height=letter1Height,
+            letter1Depth=letter1Depth, letter1OffsetX=letter1OffsetX, letter1OffsetY=letter1OffsetY,
+            letter1OffsetZ=letter1OffsetZ, letter2Width=letter2Width, letter2Height=letter2Height,
+            letter2Depth=letter2Depth, letter2OffsetX=letter2OffsetX, letter2OffsetY=letter2OffsetY,
             letter2OffsetZ=letter2OffsetZ
         )
         
@@ -520,67 +688,35 @@ def generate_stl():
             scad_path = scad_file.name
         
         stl_path = scad_path.replace('.scad', '.stl')
-        
-        cmd = [
-            'openscad',
-            '-o', stl_path,
-            '--export-format', 'binstl',
-            scad_path
-        ]
-        
+        cmd = ['openscad', '-o', stl_path, '--export-format', 'binstl', scad_path]
         env = os.environ.copy()
         env['DISPLAY'] = ':99'
         
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            env=env
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
         
         if result.returncode != 0:
-            logger.error(f"OpenSCAD error: {result.stderr}")
-            return jsonify({
-                'error': 'OpenSCAD execution failed',
-                'details': result.stderr
-            }), 500
+            return jsonify({'error': 'OpenSCAD execution failed'}), 500
         
         if not os.path.exists(stl_path):
-            logger.error("STL file not generated")
-            return jsonify({
-                'error': 'STL file not generated'
-            }), 500
+            return jsonify({'error': 'STL file not generated'}), 500
         
-        logger.info(f"STL generated successfully: {stl_path}")
-        
-        response = send_file(
-            stl_path,
-            mimetype='application/octet-stream',
-            as_attachment=True,
-            download_name=f'{letter1}{letter2}_DUET.stl'
-        )
+        response = send_file(stl_path, mimetype='application/octet-stream',
+                           as_attachment=True, download_name=f'{letter1}{letter2}_DUET.stl')
         
         @response.call_on_close
         def cleanup():
             try:
                 os.unlink(scad_path)
                 os.unlink(stl_path)
-                logger.info("Temporary files cleaned up")
-            except Exception as e:
-                logger.warning(f"Cleanup error: {e}")
+            except:
+                pass
         
         return response
-        
     except Exception as e:
-        logger.error(f"Error in generate_stl: {str(e)}", exc_info=True)
-        return jsonify({
-            'error': 'Internal server error',
-            'details': str(e)
-        }), 500
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 # ==========================================
-# 金流和訂單處理
+# 金流 API
 # ==========================================
 
 def generate_check_mac_value(params, hash_key, hash_iv):
@@ -590,245 +726,7 @@ def generate_check_mac_value(params, hash_key, hash_iv):
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     encoded_str = urllib.parse.quote_plus(raw_str).lower()
     check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
-    logger.info(f"🔐 CheckMacValue 生成: {check_mac[:10]}...")
     return check_mac
-
-def save_order(order_id, order_data):
-    """儲存訂單"""
-    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(order_data, f, ensure_ascii=False, indent=2)
-    logger.info(f"✅ 訂單已儲存: {order_id}")
-
-def load_order(order_id):
-    """讀取訂單"""
-    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
-    if not os.path.exists(filepath):
-        logger.error(f"❌ 訂單不存在: {order_id}")
-        return None
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def update_order_status(order_id, status, payment_data=None):
-    """更新訂單狀態"""
-    order = load_order(order_id)
-    if not order:
-        return False
-    order['status'] = status
-    order['updated_at'] = datetime.now().isoformat()
-    if payment_data:
-        order['payment_data'] = payment_data
-    save_order(order_id, order)
-    logger.info(f"📝 訂單狀態更新: {order_id} → {status}")
-    return True
-
-# ==========================================
-# Email 系統
-# ==========================================
-
-def send_confirmation_email(order_data):
-    """發送付款確認 Email（不含 STL）"""
-    try:
-        logger.info(f"📧 發送確認 Email: {order_data['orderId']}")
-        
-        msg = MIMEMultipart()
-        msg['From'] = f"{EMAIL_CONFIG['sender_name']} <{EMAIL_CONFIG['sender_email']}>"
-        msg['To'] = EMAIL_CONFIG['internal_email']
-        msg['Subject'] = f"訂單確認 - {order_data['orderId']}"
-        
-        html_body = generate_confirmation_email_html(order_data)
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-        
-        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-            server.starttls()
-            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-            server.send_message(msg)
-        
-        logger.info(f"✅ 確認 Email 發送成功")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ 確認 Email 發送失敗: {str(e)}")
-        return False
-
-def send_stl_email(order_data, stl_files):
-    """發送帶 STL 的 Email"""
-    try:
-        logger.info(f"📧 發送 STL Email: {order_data['orderId']}")
-        
-        msg = MIMEMultipart()
-        msg['From'] = f"{EMAIL_CONFIG['sender_name']} <{EMAIL_CONFIG['sender_email']}>"
-        msg['To'] = EMAIL_CONFIG['internal_email']
-        msg['Subject'] = f"3D 檔案已完成 - {order_data['orderId']}"
-        
-        html_body = generate_stl_email_html(order_data)
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-        
-        # 附加 STL 檔案
-        for stl_path in stl_files:
-            if os.path.exists(stl_path):
-                attach_file(msg, stl_path)
-        
-        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-            server.starttls()
-            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-            server.send_message(msg)
-        
-        logger.info(f"✅ STL Email 發送成功")
-        return True
-        
-    except Exception as e:
-        logger.error(f"❌ STL Email 發送失敗: {str(e)}")
-        return False
-
-def send_admin_alert(order_id, error_message):
-    """發送管理員告警"""
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_CONFIG['sender_email']
-        msg['To'] = EMAIL_CONFIG['internal_email']
-        msg['Subject'] = f"⚠️ STL 生成失敗 - {order_id}"
-        
-        body = f'''
-        <html>
-        <body>
-            <h2>⚠️ STL 生成失敗</h2>
-            <p><strong>訂單編號:</strong> {order_id}</p>
-            <p><strong>錯誤訊息:</strong> {error_message}</p>
-            <p>已重試 3 次，仍然失敗。</p>
-            <p>請手動處理此訂單。</p>
-            <p><a href="{request.host_url}api/retry-stl/{order_id}">點擊重試</a></p>
-        </body>
-        </html>
-        '''
-        
-        msg.attach(MIMEText(body, 'html', 'utf-8'))
-        
-        with smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port']) as server:
-            server.starttls()
-            server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-            server.send_message(msg)
-        
-        logger.info(f"✅ 管理員告警已發送")
-        
-    except Exception as e:
-        logger.error(f"❌ 管理員告警發送失敗: {str(e)}")
-
-def attach_file(msg, filepath):
-    """附加檔案到 Email"""
-    filename = os.path.basename(filepath)
-    with open(filepath, 'rb') as f:
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload(f.read())
-    encoders.encode_base64(part)
-    part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-    msg.attach(part)
-    logger.info(f"📎 附加檔案: {filename}")
-
-def generate_confirmation_email_html(order_data):
-    """生成確認 Email HTML"""
-    items_html = ''
-    for idx, item in enumerate(order_data['items'], 1):
-        items_html += f'''
-        <tr>
-            <td>{idx}</td>
-            <td>{item['letter1']} + {item['letter2']}</td>
-            <td>{item['size']} mm</td>
-            <td>{item['quantity']}</td>
-            <td>NT$ {item['price'] * item['quantity']:,}</td>
-        </tr>
-        '''
-    
-    test_mode_warning = ''
-    if order_data.get('testMode'):
-        test_mode_warning = '<div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 5px; margin-bottom: 20px;"><strong>⚠️ 測試訂單</strong></div>'
-    
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
-        th {{ background: #f5f5f5; }}
-    </style></head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>✅ 訂單確認</h1>
-                <p>訂單編號: {order_data['orderId']}</p>
-            </div>
-            {test_mode_warning}
-            <h2>付款成功！</h2>
-            <p>感謝您的訂購，我們已收到您的付款。</p>
-            <h3>訂購項目</h3>
-            <table>
-                <tr>
-                    <th>#</th>
-                    <th>字母</th>
-                    <th>尺寸</th>
-                    <th>數量</th>
-                    <th>金額</th>
-                </tr>
-                {items_html}
-                <tr>
-                    <td colspan="4" style="text-align: right;"><strong>總計:</strong></td>
-                    <td><strong>NT$ {order_data['total']:,}</strong></td>
-                </tr>
-            </table>
-            <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p><strong>📌 下一步</strong></p>
-                <p>我們正在為您製作 3D 檔案，完成後將再次通知您。</p>
-                <p>預計時間：5-10 分鐘</p>
-            </div>
-            <p style="color: #666; font-size: 12px;">此郵件由系統自動發送</p>
-        </div>
-    </body>
-    </html>
-    '''
-    return html
-
-def generate_stl_email_html(order_data):
-    """生成 STL Email HTML"""
-    items_html = ''
-    for idx, item in enumerate(order_data['items'], 1):
-        items_html += f'<li>{item["letter1"]} + {item["letter2"]} ({item["size"]} mm)</li>'
-    
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
-    </style></head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>🎉 3D 檔案已完成</h1>
-                <p>訂單編號: {order_data['orderId']}</p>
-            </div>
-            <h2>檔案製作完成！</h2>
-            <p>您訂購的 3D 檔案已製作完成。</p>
-            <h3>項目清單</h3>
-            <ul>{items_html}</ul>
-            <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p><strong>📎 附件</strong></p>
-                <p>STL 檔案已附加在此郵件中，請下載使用。</p>
-            </div>
-            <p>我們將盡快為您製作實體產品。</p>
-            <p style="color: #666; font-size: 12px;">此郵件由系統自動發送</p>
-        </div>
-    </body>
-    </html>
-    '''
-    return html
-
-# ==========================================
-# 金流 API
-# ==========================================
 
 @app.route('/api/checkout', methods=['POST'])
 def checkout():
@@ -868,42 +766,18 @@ def checkout():
             'EncryptType': '1'
         }
         
-        check_mac_value = generate_check_mac_value(
-            payment_params, 
-            ECPAY_CONFIG['HashKey'], 
-            ECPAY_CONFIG['HashIV']
-        )
+        check_mac_value = generate_check_mac_value(payment_params, 
+                                                   ECPAY_CONFIG['HashKey'], 
+                                                   ECPAY_CONFIG['HashIV'])
         payment_params['CheckMacValue'] = check_mac_value
         
-        form_html = generate_payment_form(payment_params)
+        form_fields = ''.join([f'<input type="hidden" name="{k}" value="{v}">' 
+                              for k, v in payment_params.items()])
+        form_html = f'<form id="ecpay-form" method="post" action="{ECPAY_CONFIG["PaymentURL"]}">{form_fields}</form>'
         
-        logger.info(f"✅ 支付表單已生成: {order_id}")
-        
-        return jsonify({
-            'success': True,
-            'paymentFormHTML': form_html,
-            'orderId': order_id
-        })
-        
+        return jsonify({'success': True, 'paymentFormHTML': form_html, 'orderId': order_id})
     except Exception as e:
-        logger.error(f"❌ 結帳錯誤: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-def generate_payment_form(params):
-    """生成綠界支付表單 HTML"""
-    form_fields = ''.join([
-        f'<input type="hidden" name="{k}" value="{v}">'
-        for k, v in params.items()
-    ])
-    html = f'''
-    <form id="ecpay-form" method="post" action="{ECPAY_CONFIG['PaymentURL']}">
-        {form_fields}
-    </form>
-    '''
-    return html
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/payment/callback', methods=['POST'])
 def payment_callback():
@@ -912,13 +786,10 @@ def payment_callback():
         data = request.form.to_dict()
         logger.info(f"📥 收到綠界回調: {data.get('MerchantTradeNo')}")
         
-        # 驗證 CheckMacValue
         received_check_mac = data.pop('CheckMacValue', '')
-        calculated_check_mac = generate_check_mac_value(
-            data, 
-            ECPAY_CONFIG['HashKey'], 
-            ECPAY_CONFIG['HashIV']
-        )
+        calculated_check_mac = generate_check_mac_value(data, 
+                                                       ECPAY_CONFIG['HashKey'], 
+                                                       ECPAY_CONFIG['HashIV'])
         
         if received_check_mac != calculated_check_mac:
             logger.error(f"❌ CheckMacValue 驗證失敗！")
@@ -932,46 +803,37 @@ def payment_callback():
             process_order_after_payment(order_id, data)
             return '1|OK'
         else:
-            logger.warning(f"⚠️ 付款失敗: {data.get('RtnMsg')}")
             order_id = data.get('MerchantTradeNo')
             if order_id:
                 update_order_status(order_id, 'payment_failed', data)
             return '0|Payment Failed'
-            
     except Exception as e:
         logger.error(f"❌ 回調處理錯誤: {str(e)}")
         return '0|Error'
 
 def process_order_after_payment(order_id, payment_data):
-    """
-    付款成功後處理訂單（新版：使用隊列）
-    """
+    """付款成功後處理訂單"""
     try:
-        logger.info(f"🔄 開始處理訂單: {order_id}")
-        
         order = load_order(order_id)
         if not order:
-            logger.error(f"❌ 訂單不存在: {order_id}")
             return False
         
-        # 1. 更新訂單狀態為已付款
+        # 1. 更新訂單狀態
         update_order_status(order_id, 'paid', payment_data)
         
-        # 2. 立即發送確認 Email（不含 STL）
-        confirmation_sent = send_confirmation_email(order)
+        # 2. 發送顧客確認 Email
+        send_customer_confirmation_email(order)
         
-        if not confirmation_sent:
-            logger.warning(f"⚠️ 確認 Email 發送失敗: {order_id}")
+        # 3. 發送內部訂單通知 Email（無 STL）
+        send_internal_order_email(order)
         
-        # 3. 加入 STL 生成隊列
+        # 4. 加入 STL 生成隊列
         add_to_stl_queue(order_id)
         
-        logger.info(f"✅ 訂單 {order_id} 初步處理完成，已加入 STL 隊列")
+        logger.info(f"✅ 訂單 {order_id} 處理完成，已加入 STL 隊列")
         return True
-        
     except Exception as e:
         logger.error(f"❌ 訂單處理錯誤: {str(e)}")
-        update_order_status(order_id, 'error')
         return False
 
 @app.route('/api/test-order', methods=['POST'])
@@ -983,14 +845,11 @@ def test_order():
         
         save_order(data['orderId'], data)
         
-        # 立即發送確認 Email
-        confirmation_sent = send_confirmation_email(data)
+        # 發送顧客確認 Email
+        send_customer_confirmation_email(data)
         
-        if not confirmation_sent:
-            return jsonify({
-                'success': False,
-                'error': 'Email 發送失敗'
-            }), 500
+        # 發送內部訂單通知 Email
+        send_internal_order_email(data)
         
         # 加入 STL 生成隊列
         add_to_stl_queue(data['orderId'])
@@ -999,7 +858,7 @@ def test_order():
         
         return jsonify({
             'success': True,
-            'message': '測試訂單已處理，確認 Email 已發送，STL 正在背景生成'
+            'message': '測試訂單已處理，Email 已發送，STL 正在背景生成'
         })
             
     except Exception as e:
@@ -1009,111 +868,32 @@ def test_order():
             'error': str(e)
         }), 500
 
-@app.route('/api/process-queue', methods=['POST'])
-def trigger_queue_processing():
-    """手動觸發隊列處理（可以用 cron job 定時呼叫）"""
-    try:
-        process_stl_queue()
-        return jsonify({
-            'success': True,
-            'message': '隊列處理已觸發'
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/retry-stl/<order_id>', methods=['GET', 'POST'])
-def retry_stl(order_id):
-    """手動重試 STL 生成"""
-    try:
-        logger.info(f"🔄 手動重試 STL 生成: {order_id}")
-        
-        # 重新加入隊列
-        add_to_stl_queue(order_id, retry_count=0)
-        
-        # 立即處理
-        process_stl_queue()
-        
-        return jsonify({
-            'success': True,
-            'message': f'訂單 {order_id} 已重新加入隊列'
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ 重試失敗: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 @app.route('/payment-success')
 def payment_success():
     """支付成功頁面"""
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>支付成功 - DUET</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            }
-            .container {
-                background: white;
-                padding: 40px;
-                border-radius: 15px;
-                text-align: center;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            }
-            .success-icon { font-size: 60px; color: #4CAF50; margin-bottom: 20px; }
-            h1 { color: #333; margin-bottom: 10px; }
-            p { color: #666; line-height: 1.6; }
-            .btn {
-                display: inline-block;
-                margin-top: 20px;
-                padding: 12px 30px;
-                background: #667eea;
-                color: white;
-                text-decoration: none;
-                border-radius: 5px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="success-icon">✅</div>
-            <h1>支付成功！</h1>
-            <p>感謝您的訂購！</p>
-            <p>確認信已發送至您的信箱。</p>
-            <p>3D 檔案將在 5-10 分鐘內完成製作。</p>
-            <a href="/" class="btn">返回首頁</a>
-        </div>
-    </body>
-    </html>
-    '''
+    return '''<!DOCTYPE html><html><head><meta charset="UTF-8"><title>支付成功 - DUET</title>
+    <style>body{font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;
+    margin:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}.container{background:white;
+    padding:40px;border-radius:15px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
+    .success-icon{font-size:60px;color:#4CAF50;margin-bottom:20px}h1{color:#333;margin-bottom:10px}
+    p{color:#666;line-height:1.6}.btn{display:inline-block;margin-top:20px;padding:12px 30px;
+    background:#667eea;color:white;text-decoration:none;border-radius:5px}</style></head>
+    <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
+    <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>我們將盡快為您製作產品。</p>
+    <a href="/" class="btn">返回首頁</a></div></body></html>'''
 
 # ==========================================
-# 啟動應用
+# 啟動
 # ==========================================
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     logger.info("🚀 DUET Backend 啟動中...")
-    logger.info(f"📧 Email: {EMAIL_CONFIG['sender_email']} → {EMAIL_CONFIG['internal_email']}")
+    logger.info(f"📧 Email 服務: Resend")
+    logger.info(f"📧 發件人: {SENDER_EMAIL}")
+    logger.info(f"📧 內部收件: {INTERNAL_EMAIL}")
     logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
-    logger.info(f"📂 訂單目錄: {ORDERS_DIR}")
-    logger.info(f"📋 隊列目錄: {QUEUE_DIR}")
     
-    # 啟動背景 Worker
     start_background_worker()
     
     app.run(host='0.0.0.0', port=port, debug=False)
