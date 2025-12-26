@@ -161,10 +161,26 @@ def stl_queue_worker():
         time.sleep(60)
 
 def start_background_worker():
-    """啟動背景 Worker"""
-    worker_thread = threading.Thread(target=stl_queue_worker, daemon=True)
-    worker_thread.start()
-    logger.info("✅ 背景 Worker 已啟動")
+    """啟動背景 Worker（使用文件鎖確保只啟動一次）"""
+    import fcntl
+    lock_file = '/tmp/duet_worker.lock'
+    
+    try:
+        # 嘗試取得鎖
+        lock_fd = open(lock_file, 'w')
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        # 成功取得鎖，啟動 Worker
+        worker_thread = threading.Thread(target=stl_queue_worker, daemon=True)
+        worker_thread.start()
+        logger.info("✅ 背景 Worker 已啟動（已取得鎖）")
+        
+        # 保持文件打開以維持鎖
+        app._worker_lock_fd = lock_fd
+        
+    except IOError:
+        # 鎖已被其他進程持有
+        logger.info("⏸️ 背景 Worker 已在其他進程中運行，跳過啟動")
 
 # ==========================================
 # STL 生成
