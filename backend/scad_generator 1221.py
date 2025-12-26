@@ -1,10 +1,10 @@
-def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendant_y, pendant_z, pendant_rotation_y):
+def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, bailRelativeY, bailRelativeZ, bailRotation):
     """
     生成與前端 Z-Up 系統完全一致的 OpenSCAD 腳本
     
     關鍵修正：
     1. Letter 2 旋轉順序匹配前端
-    2. 參數映射：pendant_z → Y軸, pendant_y → Z軸
+    2. 使用相對向量定位墜頭：墜頭位置 = 主體中心 + 相對向量
     3. 使用 resize() 確保精確高度
     4. union() 確保無破面
     5. 字體名稱由後端嚴格驗證，直接使用
@@ -18,25 +18,25 @@ def generate_scad_script(letter1, letter2, font1, font2, size, pendant_x, pendan
         fn = 48
     
     depth = size * 5.0
+    bail_radius = 1.85
+    bail_tube = 0.35
     
-    # 墜頭規格 - 與前端一致
-    # 目標：內徑 1.5mm, 管徑 0.7mm
-    # OpenSCAD: translate([bail_radius, 0]) circle(r=bail_tube)
-    # 內徑半徑 = bail_radius - bail_tube = 0.75mm
-    # 因此：bail_tube = 0.35, bail_radius = 1.1
-    bail_tube = 0.35      # 管半徑 (管徑 = 0.7mm)
-    bail_radius = 1.1     # 到管中心的距離 (內徑 = 1.5mm)
-    
-    bail_rotation_with_offset = pendant_rotation_y + 90
+    # 使用固定 text size，然後等比縮放（模仿前端邏輯）
+    text_base_size = 10.0
+    scale_factor = size / text_base_size  # 15 / 10 = 1.5
     
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🔧 DEBUG: pendant_rotation_y={pendant_rotation_y}, bail_rotation_with_offset={bail_rotation_with_offset}")
+    logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
+    logger.info(f"📐 縮放參數: text_base_size={text_base_size}, scale_factor={scale_factor}")
     
-    # 墜頭位置
-    pos_x = 0 + pendant_x
-    pos_y = 0 + pendant_y
-    pos_z = (size / 2.0) + 2.0 + pendant_z
+    # 墜頭位置 = 主體中心 + 相對向量
+    # 在 OpenSCAD 中，主體使用 halign="center", valign="center"，所以中心點在原點 (0, 0, 0)
+    pos_x = 0 + bailRelativeX
+    pos_y = 0 + bailRelativeY
+    pos_z = 0 + bailRelativeZ
+    # 前端墜頭有初始 90° 旋轉（geometry.rotateZ(Math.PI/2)），後端需要加上這個偏移
+    bail_rotation_deg = bailRotation + 90
     
     scad_script = f'''// DUET Z-Up System
 $fn = {fn};
@@ -47,29 +47,28 @@ font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};
 depth = {depth};
+text_base_size = {text_base_size};
+scale_factor = {scale_factor};
 bail_radius = {bail_radius};
 bail_tube = {bail_tube};
 pos_x = {pos_x};
 pos_y = {pos_y};
 pos_z = {pos_z};
-bail_rotation = {bail_rotation_with_offset};
-
-module letter_geometry(char, font_name, target_h) {{
-    resize([0, target_h, 0], auto=true)
-        text(char, font=font_name, halign="center", valign="center");
-}}
+bail_rotation = {bail_rotation_deg};
 
 module letter1_shape() {{
     rotate([90, 0, 0])
-        linear_extrude(height=depth, center=true)
-            letter_geometry(letter1, font1, target_height);
+        scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
+            linear_extrude(height=depth, center=true)
+                text(letter1, font=font1, size=text_base_size, halign="center", valign="center");
 }}
 
 module letter2_shape() {{
     rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
         rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
-            linear_extrude(height=depth, center=true)
-                letter_geometry(letter2, font2, target_height);
+            scale([scale_factor, scale_factor, scale_factor])  // 等比縮放
+                linear_extrude(height=depth, center=true)
+                    text(letter2, font=font2, size=text_base_size, halign="center", valign="center");
 }}
 
 module bail() {{
