@@ -55,7 +55,7 @@ EMAIL_CONFIG = {
     'smtp_server': 'smtp.gmail.com',
     'smtp_port': 587,
     'sender_email': 'service@brendonchen.com',
-    'sender_password': 'daqd awju eodn dwpa',
+    'sender_password': 'ptja xltm uoeh basi',  # ← 更新這裡
     'sender_name': 'DUET 客製珠寶',
     'internal_email': 'brendon@brendonchen.com'
 }
