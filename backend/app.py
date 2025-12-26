@@ -883,17 +883,22 @@ def payment_success():
     <a href="/" class="btn">返回首頁</a></div></body></html>'''
 
 # ==========================================
-# 啟動
+# 初始化（Gunicorn 會執行這裡）
+# ==========================================
+
+logger.info("🚀 DUET Backend 初始化中...")
+logger.info(f"📧 Email 服務: Resend")
+logger.info(f"📧 發件人: {SENDER_EMAIL}")
+logger.info(f"📧 內部收件: {INTERNAL_EMAIL}")
+logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
+
+# 啟動背景 Worker
+start_background_worker()
+
+# ==========================================
+# 本地開發用
 # ==========================================
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    logger.info("🚀 DUET Backend 啟動中...")
-    logger.info(f"📧 Email 服務: Resend")
-    logger.info(f"📧 發件人: {SENDER_EMAIL}")
-    logger.info(f"📧 內部收件: {INTERNAL_EMAIL}")
-    logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
-    
-    start_background_worker()
-    
     app.run(host='0.0.0.0', port=port, debug=False)
