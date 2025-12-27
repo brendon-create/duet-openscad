@@ -19,15 +19,6 @@ import threading
 import time
 import base64
 
-# Google Sheets 整合（選用）
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    GOOGLE_SHEETS_ENABLED = True
-except ImportError:
-    GOOGLE_SHEETS_ENABLED = False
-    logger.warning("Google Sheets 模組未安裝，將跳過 Sheets 整合")
-
 # ==========================================
 # Flask 應用初始化
 # ==========================================
@@ -39,6 +30,16 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
+
+# Google Sheets 整合（選用）
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    GOOGLE_SHEETS_ENABLED = True
+except ImportError:
+    GOOGLE_SHEETS_ENABLED = False
+    logger.warning("⚠️ Google Sheets 模組未安裝，將跳過 Sheets 整合")
 logger = logging.getLogger(__name__)
 
 TEMP_DIR = tempfile.gettempdir()
