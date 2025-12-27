@@ -1009,9 +1009,8 @@ def process_order_after_payment(order_id, payment_data):
                 send_customer_confirmation_email(order)
                 logger.info(f"✅ Email 1 已發送: {order_id}")
                 
-                # 發送內部訂單通知 Email
-                send_internal_order_email(order)
-                logger.info(f"✅ Email 2 已發送: {order_id}")
+                # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
+                # send_internal_order_email(order)  # ← 不再需要
                 
                 # 儲存到 Google Sheets
                 save_to_google_sheets(order)
@@ -1052,9 +1051,8 @@ def test_order():
                 send_customer_confirmation_email(data)
                 logger.info(f"✅ Email 1 已發送: {order_id}")
                 
-                # 發送內部訂單通知 Email
-                send_internal_order_email(data)
-                logger.info(f"✅ Email 2 已發送: {order_id}")
+                # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
+                # send_internal_order_email(data)  # ← 不再需要
                 
                 # 儲存到 Google Sheets
                 save_to_google_sheets(data)
