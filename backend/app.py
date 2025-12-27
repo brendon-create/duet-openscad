@@ -19,6 +19,15 @@ import threading
 import time
 import base64
 
+# Google Sheets 整合（選用）
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    GOOGLE_SHEETS_ENABLED = True
+except ImportError:
+    GOOGLE_SHEETS_ENABLED = False
+    logger.warning("Google Sheets 模組未安裝，將跳過 Sheets 整合")
+
 # ==========================================
 # Flask 應用初始化
 # ==========================================
@@ -56,13 +65,117 @@ INTERNAL_EMAIL = 'brendon@brendonchen.com'
 # 設定 Resend API Key
 resend.api_key = RESEND_API_KEY
 
+# Google Sheets 配置（選用）
+GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')  # 從環境變數讀取
+GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
+
 # 目錄配置
 ORDERS_DIR = 'orders'
 STL_DIR = 'stl_files'
 QUEUE_DIR = 'stl_queue'
+ORDERS_FILE = os.path.join(ORDERS_DIR, 'orders.json')  # 持久化訂單資料
 os.makedirs(ORDERS_DIR, exist_ok=True)
 os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
+
+# ==========================================
+# 訂單資料管理
+# ==========================================
+
+# 訂單資料（記憶體中）
+orders = {}
+
+def load_orders():
+    """從檔案載入訂單資料"""
+    global orders
+    if os.path.exists(ORDERS_FILE):
+        try:
+            with open(ORDERS_FILE, 'r', encoding='utf-8') as f:
+                orders = json.load(f)
+            logger.info(f"📂 已載入 {len(orders)} 筆訂單")
+        except Exception as e:
+            logger.error(f"❌ 載入訂單失敗: {e}")
+            orders = {}
+    else:
+        orders = {}
+        logger.info("📂 初始化空訂單資料")
+
+def save_orders():
+    """儲存訂單資料到檔案"""
+    try:
+        with open(ORDERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(orders, f, ensure_ascii=False, indent=2)
+        logger.info(f"💾 已儲存 {len(orders)} 筆訂單")
+    except Exception as e:
+        logger.error(f"❌ 儲存訂單失敗: {e}")
+
+def save_order(order_id, order_data):
+    """儲存單筆訂單"""
+    orders[order_id] = order_data
+    save_orders()
+    logger.info(f"✅ 訂單已儲存: {order_id}")
+
+def get_order(order_id):
+    """取得訂單資料"""
+    return orders.get(order_id)
+
+# ==========================================
+# Google Sheets 整合
+# ==========================================
+
+def save_to_google_sheets(order_data):
+    """儲存訂單到 Google Sheets"""
+    if not GOOGLE_SHEETS_ENABLED or not GOOGLE_SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
+        logger.warning("⚠️ Google Sheets 未啟用，跳過")
+        return
+    
+    try:
+        # 載入憑證
+        import tempfile
+        creds_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json')
+        creds_file.write(GOOGLE_CREDENTIALS_JSON)
+        creds_file.close()
+        
+        creds = service_account.Credentials.from_service_account_file(
+            creds_file.name,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        service = build('sheets', 'v4', credentials=creds)
+        
+        # 準備資料行
+        items = order_data.get('items', [])
+        item1 = json.dumps(items[0], ensure_ascii=False) if len(items) > 0 else ''
+        item2 = json.dumps(items[1], ensure_ascii=False) if len(items) > 1 else ''
+        item3 = json.dumps(items[2], ensure_ascii=False) if len(items) > 2 else ''
+        
+        row = [
+            order_data.get('orderId', ''),
+            order_data.get('userInfo', {}).get('name', ''),
+            order_data.get('userInfo', {}).get('email', ''),
+            order_data.get('userInfo', {}).get('phone', ''),
+            item1,
+            item2,
+            item3,
+            order_data.get('total', 0),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            order_data.get('status', 'pending')
+        ]
+        
+        # 寫入 Google Sheets
+        service.spreadsheets().values().append(
+            spreadsheetId=GOOGLE_SHEETS_ID,
+            range='訂單!A:J',
+            valueInputOption='RAW',
+            body={'values': [row]}
+        ).execute()
+        
+        logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')}")
+        
+        # 清理臨時檔案
+        os.unlink(creds_file.name)
+        
+    except Exception as e:
+        logger.error(f"❌ Google Sheets 儲存失敗: {e}")
 
 # ==========================================
 # 隊列系統
@@ -735,6 +848,50 @@ def generate_stl():
 # 金流 API
 # ==========================================
 
+def prepare_custom_fields(order_data):
+    """準備綠界 CustomField（訂單備份）"""
+    try:
+        user_info = order_data.get('userInfo', {})
+        items = order_data.get('items', [])
+        
+        # CustomField1: 關鍵資訊 (~60字)
+        field1 = json.dumps({
+            "O": order_data.get('orderId', ''),
+            "N": user_info.get('name', ''),
+            "E": user_info.get('email', ''),
+            "P": user_info.get('phone', ''),
+            "I": len(items),
+            "T": order_data.get('total', 0)
+        }, ensure_ascii=False)[:200]
+        
+        # CustomField2-4: 各物件參數（每個~100字）
+        def compress_item(item):
+            return json.dumps({
+                "L1": item.get('letter1', ''),
+                "L2": item.get('letter2', ''),
+                "F1": item.get('font1', ''),
+                "F2": item.get('font2', ''),
+                "S": item.get('size', 15),
+                "M": item.get('material', '金'),
+                "BX": item.get('bailAbsoluteX', 0),
+                "BY": item.get('bailAbsoluteY', 0),
+                "BZ": item.get('bailAbsoluteZ', 0)
+            }, ensure_ascii=False)[:200]
+        
+        field2 = compress_item(items[0]) if len(items) > 0 else ''
+        field3 = compress_item(items[1]) if len(items) > 1 else ''
+        field4 = compress_item(items[2]) if len(items) > 2 else ''
+        
+        return {
+            'CustomField1': field1,
+            'CustomField2': field2,
+            'CustomField3': field3,
+            'CustomField4': field4
+        }
+    except Exception as e:
+        logger.error(f"❌ 準備 CustomField 失敗: {e}")
+        return {}
+
 def generate_check_mac_value(params, hash_key, hash_iv):
     """產生綠界 CheckMacValue"""
     sorted_params = sorted(params.items())
@@ -768,6 +925,9 @@ def checkout():
         }
         save_order(order_id, order_data)
         
+        # 準備 CustomField（訂單備份）
+        custom_fields = prepare_custom_fields(order_data)
+        
         payment_params = {
             'MerchantID': ECPAY_CONFIG['MerchantID'],
             'MerchantTradeNo': order_id,
@@ -779,7 +939,8 @@ def checkout():
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
             'ClientBackURL': return_url,
             'ChoosePayment': 'Credit',
-            'EncryptType': '1'
+            'EncryptType': '1',
+            **custom_fields  # 加入 CustomField
         }
         
         check_mac_value = generate_check_mac_value(payment_params, 
@@ -790,6 +951,8 @@ def checkout():
         form_fields = ''.join([f'<input type="hidden" name="{k}" value="{v}">' 
                               for k, v in payment_params.items()])
         form_html = f'<form id="ecpay-form" method="post" action="{ECPAY_CONFIG["PaymentURL"]}">{form_fields}</form>'
+        
+        logger.info(f"✅ 綠界表單已生成，包含 CustomField 備份")
         
         return jsonify({'success': True, 'paymentFormHTML': form_html, 'orderId': order_id})
     except Exception as e:
@@ -828,25 +991,40 @@ def payment_callback():
         return '0|Error'
 
 def process_order_after_payment(order_id, payment_data):
-    """付款成功後處理訂單"""
+    """付款成功後處理訂單（非同步）"""
     try:
-        order = load_order(order_id)
+        order = get_order(order_id)
         if not order:
+            logger.error(f"❌ 找不到訂單: {order_id}")
             return False
         
-        # 1. 更新訂單狀態
+        # 1. 立即更新訂單狀態（同步）
         update_order_status(order_id, 'paid', payment_data)
         
-        # 2. 發送顧客確認 Email
-        send_customer_confirmation_email(order)
+        # 2. 非同步處理（不阻塞綠界回調）
+        def async_tasks():
+            try:
+                # 發送顧客確認 Email
+                send_customer_confirmation_email(order)
+                logger.info(f"✅ Email 1 已發送: {order_id}")
+                
+                # 發送內部訂單通知 Email
+                send_internal_order_email(order)
+                logger.info(f"✅ Email 2 已發送: {order_id}")
+                
+                # 儲存到 Google Sheets
+                save_to_google_sheets(order)
+                
+                # 加入 STL 生成隊列
+                add_to_stl_queue(order_id)
+                
+            except Exception as e:
+                logger.error(f"❌ 非同步任務錯誤: {e}")
         
-        # 3. 發送內部訂單通知 Email（無 STL）
-        send_internal_order_email(order)
+        # 啟動背景線程
+        threading.Thread(target=async_tasks, daemon=True).start()
         
-        # 4. 加入 STL 生成隊列
-        add_to_stl_queue(order_id)
-        
-        logger.info(f"✅ 訂單 {order_id} 處理完成，已加入 STL 隊列")
+        logger.info(f"✅ 訂單 {order_id} 已加入處理隊列")
         return True
     except Exception as e:
         logger.error(f"❌ 訂單處理錯誤: {str(e)}")
@@ -854,24 +1032,42 @@ def process_order_after_payment(order_id, payment_data):
 
 @app.route('/api/test-order', methods=['POST'])
 def test_order():
-    """測試模式：模擬訂單處理"""
+    """測試模式：模擬訂單處理（非同步）"""
     try:
         data = request.json
-        logger.info(f"🧪 測試模式訂單: {data.get('orderId')}")
+        order_id = data.get('orderId')
+        logger.info(f"🧪 測試模式訂單: {order_id}")
         
-        save_order(data['orderId'], data)
+        # 立即儲存訂單（同步）
+        save_order(order_id, data)
         
-        # 發送顧客確認 Email
-        send_customer_confirmation_email(data)
+        # 更新訂單狀態
+        update_order_status(order_id, 'test_processing')
         
-        # 發送內部訂單通知 Email
-        send_internal_order_email(data)
+        # 非同步處理（不阻塞前端）
+        def async_tasks():
+            try:
+                # 發送顧客確認 Email
+                send_customer_confirmation_email(data)
+                logger.info(f"✅ Email 1 已發送: {order_id}")
+                
+                # 發送內部訂單通知 Email
+                send_internal_order_email(data)
+                logger.info(f"✅ Email 2 已發送: {order_id}")
+                
+                # 儲存到 Google Sheets
+                save_to_google_sheets(data)
+                
+                # 加入 STL 生成隊列
+                add_to_stl_queue(order_id)
+                
+            except Exception as e:
+                logger.error(f"❌ 非同步任務錯誤: {e}")
         
-        # 加入 STL 生成隊列
-        add_to_stl_queue(data['orderId'])
+        # 啟動背景線程
+        threading.Thread(target=async_tasks, daemon=True).start()
         
-        update_order_status(data['orderId'], 'test_processing')
-        
+        # 立即返回（前端不等待）
         return jsonify({
             'success': True,
             'message': '測試訂單已處理，Email 已發送，STL 正在背景生成'
@@ -907,6 +1103,9 @@ logger.info(f"📧 Email 服務: Resend")
 logger.info(f"📧 發件人: {SENDER_EMAIL}")
 logger.info(f"📧 內部收件: {INTERNAL_EMAIL}")
 logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
+
+# 載入訂單資料
+load_orders()
 
 # 啟動背景 Worker
 start_background_worker()
