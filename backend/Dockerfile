@@ -14,11 +14,11 @@ RUN apt-get update && \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# 添加 OpenSCAD nightly 源（OpenSUSE Build Service）
+# 添加 OpenSCAD 源（OpenSUSE Build Service）
 RUN echo "deb https://download.opensuse.org/repositories/home:/t-paul/xUbuntu_22.04/ ./" > /etc/apt/sources.list.d/openscad.list && \
     curl -fsSL https://download.opensuse.org/repositories/home:/t-paul/xUbuntu_22.04/Release.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/openscad.gpg
 
-# 安裝最新版 OpenSCAD
+# 安裝 OpenSCAD
 RUN apt-get update && \
     apt-get install -y openscad && \
     rm -rf /var/lib/apt/lists/*
@@ -40,4 +40,4 @@ COPY . .
 EXPOSE 8001
 
 # 啟動命令
-CMD ["python3", "app.py"]
+CMD ["python3",
