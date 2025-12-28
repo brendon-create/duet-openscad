@@ -43,13 +43,14 @@ def generate_scad_script(letter1, letter2, font1, font2, size,
     logger.info(f"   3. 對比前端 Console 輸出的最終尺寸")
     logger.info(f"════════════════════════════════════════")
     
-    # ✅ 墜頭位置 - 使用相對向量（12月20日正確版本）
-    # 前端：bailMesh.position.set(modelCenter.x + x, modelCenter.y + y, baseZ + z)
-    # 後端：modelCenter = (0, 0, 0) 因為使用 halign="center", valign="center"
-    # baseZ = modelTopZ + 2.0, modelTopZ ≈ size / 2
-    pos_x = 0 + bailRelativeX  # modelCenter.x = 0，加上相對向量
-    pos_y = 0 + bailRelativeY  # modelCenter.y = 0，加上相對向量
-    pos_z = (size / 2.0) + 2.0 + bailRelativeZ  # modelTopZ + 2.0 + 調整
+    # ✅ 墜頭位置 - 使用相對向量
+    # 前端傳來的 bailRelativeX/Y/Z 已經是完整的相對位置
+    # bailRelativeZ = bailMesh.position.z - modelCenter.z
+    #              = (modelTopZ + 2.0 + z_height_adj) - 0
+    #              = 已包含 baseZ + 調整值
+    pos_x = 0 + bailRelativeX  # modelCenter.x = 0
+    pos_y = 0 + bailRelativeY  # modelCenter.y = 0
+    pos_z = 0 + bailRelativeZ  # ✅ 直接用，不要再加 baseZ！
     
     logger.info(f"🎯 墜頭計算位置: X={pos_x:.3f}, Y={pos_y:.3f}, Z={pos_z:.3f}")
     
