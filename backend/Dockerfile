@@ -1,28 +1,27 @@
-# 使用 Ubuntu 基礎映像
-FROM ubuntu:22.04
+# DUET Backend - OpenSCAD 升級版本
+FROM ubuntu:24.04
 
 # 避免互動式提示
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 更新並安裝系統依賴
+# 安裝基本工具
 RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    wget \
+    xvfb \
     python3 \
     python3-pip \
-    openscad \
-    xvfb \
-    git \
-    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
-# 安裝 Google Fonts - 完整克隆並安裝所有 OFL 字體
-RUN mkdir -p /usr/share/fonts/truetype/google-fonts && \
-    cd /tmp && \
-    git clone https://github.com/google/fonts.git && \
-    cd fonts/ofl && \
-    find . -name "*.ttf" -exec cp {} /usr/share/fonts/truetype/google-fonts/ \; && \
-    cd /tmp && \
-    rm -rf fonts && \
-    fc-cache -f -v
+# ⚠️ 升級 OpenSCAD 到最新版本
+# 方法 1：使用 snapshots PPA（推薦）
+RUN add-apt-repository ppa:openscad/releases -y && \
+    apt-get update && \
+    apt-get install -y openscad && \
+    rm -rf /var/lib/apt/lists/*
+
+# 驗證 OpenSCAD 版本
+RUN openscad --version
 
 # 設定工作目錄
 WORKDIR /app
@@ -36,10 +35,10 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # 複製應用程式碼
 COPY . .
 
-# 暴露端口
-EXPOSE 5000
+# 設定環境變數
+ENV DISPLAY=:99
+ENV PYTHONUNBUFFERED=1
 
-# 啟動 xvfb 並使用 gunicorn
-# timeout 設定為 300 秒 (5 分鐘) 以支援高精度 STL 生成
+# 啟動 Xvfb 和應用
 CMD Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 & \
-    gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 300 app:app
+    gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 180 app:app
