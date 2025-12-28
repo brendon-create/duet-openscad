@@ -874,9 +874,10 @@ def prepare_custom_fields(order_data):
                 "F2": item.get('font2', ''),
                 "S": item.get('size', 15),
                 "M": item.get('material', '金'),
-                "BX": item.get('bailAbsoluteX', 0),
-                "BY": item.get('bailAbsoluteY', 0),
-                "BZ": item.get('bailAbsoluteZ', 0)
+                # ✅ 使用 bailRelative（相對向量），不是 bailAbsolute
+                "BX": item.get('bailRelativeX', 0),
+                "BY": item.get('bailRelativeY', 0),
+                "BZ": item.get('bailRelativeZ', 0)
             }, ensure_ascii=False)[:200]
         
         field2 = compress_item(items[0]) if len(items) > 0 else ''
