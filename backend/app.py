@@ -314,22 +314,7 @@ def generate_stl_for_item(item):
             'bailRelativeX': item.get('bailRelativeX', 0),
             'bailRelativeY': item.get('bailRelativeY', 0),
             'bailRelativeZ': item.get('bailRelativeZ', 0),
-            'bailRotation': item.get('bailRotation', 0),
-            'bailAbsoluteX': item.get('bailAbsoluteX', 0),
-            'bailAbsoluteY': item.get('bailAbsoluteY', 0),
-            'bailAbsoluteZ': item.get('bailAbsoluteZ', 0),
-            'letter1Width': item.get('letter1BBox', {}).get('width', 0),
-            'letter1Height': item.get('letter1BBox', {}).get('height', 0),
-            'letter1Depth': item.get('letter1BBox', {}).get('depth', 0),
-            'letter1OffsetX': item.get('letter1BBox', {}).get('offsetX', 0),
-            'letter1OffsetY': item.get('letter1BBox', {}).get('offsetY', 0),
-            'letter1OffsetZ': item.get('letter1BBox', {}).get('offsetZ', 0),
-            'letter2Width': item.get('letter2BBox', {}).get('width', 0),
-            'letter2Height': item.get('letter2BBox', {}).get('height', 0),
-            'letter2Depth': item.get('letter2BBox', {}).get('depth', 0),
-            'letter2OffsetX': item.get('letter2BBox', {}).get('offsetX', 0),
-            'letter2OffsetY': item.get('letter2BBox', {}).get('offsetY', 0),
-            'letter2OffsetZ': item.get('letter2BBox', {}).get('offsetZ', 0)
+            'bailRotation': item.get('bailRotation', 0)
         }
         
         scad_content = generate_scad_script(**params)
@@ -781,36 +766,13 @@ def generate_stl():
             bailRelativeZ = pendant_config.get('z', 0)
             bailRotation = pendant_config.get('rotation_y', 0)
         
-        bailAbsoluteX = data.get('bailAbsoluteX', 0)
-        bailAbsoluteY = data.get('bailAbsoluteY', 0)
-        bailAbsoluteZ = data.get('bailAbsoluteZ', 0)
-        
-        letter1Width = data.get('letter1Width', 0)
-        letter1Height = data.get('letter1Height', 0)
-        letter1Depth = data.get('letter1Depth', 0)
-        letter1OffsetX = data.get('letter1OffsetX', 0)
-        letter1OffsetY = data.get('letter1OffsetY', 0)
-        letter1OffsetZ = data.get('letter1OffsetZ', 0)
-        
-        letter2Width = data.get('letter2Width', 0)
-        letter2Height = data.get('letter2Height', 0)
-        letter2Depth = data.get('letter2Depth', 0)
-        letter2OffsetX = data.get('letter2OffsetX', 0)
-        letter2OffsetY = data.get('letter2OffsetY', 0)
-        letter2OffsetZ = data.get('letter2OffsetZ', 0)
-        
         font1 = validate_font(font1)
         font2 = validate_font(font2)
         
         scad_content = generate_scad_script(
             letter1=letter1, letter2=letter2, font1=font1, font2=font2, size=size,
             bailRelativeX=bailRelativeX, bailRelativeY=bailRelativeY, bailRelativeZ=bailRelativeZ,
-            bailRotation=bailRotation, bailAbsoluteX=bailAbsoluteX, bailAbsoluteY=bailAbsoluteY,
-            bailAbsoluteZ=bailAbsoluteZ, letter1Width=letter1Width, letter1Height=letter1Height,
-            letter1Depth=letter1Depth, letter1OffsetX=letter1OffsetX, letter1OffsetY=letter1OffsetY,
-            letter1OffsetZ=letter1OffsetZ, letter2Width=letter2Width, letter2Height=letter2Height,
-            letter2Depth=letter2Depth, letter2OffsetX=letter2OffsetX, letter2OffsetY=letter2OffsetY,
-            letter2OffsetZ=letter2OffsetZ
+            bailRotation=bailRotation
         )
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
