@@ -294,6 +294,7 @@ def generate_stl_for_item(item):
     try:
         logger.info(f"🔨 生成 STL: {item['letter1']}{item['letter2']}")
         
+        # 只傳送 scad_generator 需要的 9 個參數
         params = {
             'letter1': item['letter1'],
             'letter2': item['letter2'],
@@ -303,22 +304,7 @@ def generate_stl_for_item(item):
             'bailRelativeX': item.get('bailRelativeX', 0),
             'bailRelativeY': item.get('bailRelativeY', 0),
             'bailRelativeZ': item.get('bailRelativeZ', 0),
-            'bailRotation': item.get('bailRotation', 0),
-            'bailAbsoluteX': item.get('bailAbsoluteX', 0),
-            'bailAbsoluteY': item.get('bailAbsoluteY', 0),
-            'bailAbsoluteZ': item.get('bailAbsoluteZ', 0),
-            'letter1Width': item.get('letter1BBox', {}).get('width', 0),
-            'letter1Height': item.get('letter1BBox', {}).get('height', 0),
-            'letter1Depth': item.get('letter1BBox', {}).get('depth', 0),
-            'letter1OffsetX': item.get('letter1BBox', {}).get('offsetX', 0),
-            'letter1OffsetY': item.get('letter1BBox', {}).get('offsetY', 0),
-            'letter1OffsetZ': item.get('letter1BBox', {}).get('offsetZ', 0),
-            'letter2Width': item.get('letter2BBox', {}).get('width', 0),
-            'letter2Height': item.get('letter2BBox', {}).get('height', 0),
-            'letter2Depth': item.get('letter2BBox', {}).get('depth', 0),
-            'letter2OffsetX': item.get('letter2BBox', {}).get('offsetX', 0),
-            'letter2OffsetY': item.get('letter2BBox', {}).get('offsetY', 0),
-            'letter2OffsetZ': item.get('letter2BBox', {}).get('offsetZ', 0)
+            'bailRotation': item.get('bailRotation', 0)
         }
         
         scad_content = generate_scad_script(**params)
@@ -668,6 +654,7 @@ def generate_stl():
         data = request.json
         logger.info(f"🔨 收到 STL 生成請求")
         
+        # 只傳送 scad_generator 需要的 9 個參數
         params = {
             'letter1': data['letter1'],
             'letter2': data['letter2'],
@@ -677,22 +664,7 @@ def generate_stl():
             'bailRelativeX': data.get('bailRelativeX', 0),
             'bailRelativeY': data.get('bailRelativeY', 0),
             'bailRelativeZ': data.get('bailRelativeZ', 0),
-            'bailRotation': data.get('bailRotation', 0),
-            'bailAbsoluteX': data.get('bailAbsoluteX', 0),
-            'bailAbsoluteY': data.get('bailAbsoluteY', 0),
-            'bailAbsoluteZ': data.get('bailAbsoluteZ', 0),
-            'letter1Width': data.get('letter1BBox', {}).get('width', 0),
-            'letter1Height': data.get('letter1BBox', {}).get('height', 0),
-            'letter1Depth': data.get('letter1BBox', {}).get('depth', 0),
-            'letter1OffsetX': data.get('letter1BBox', {}).get('offsetX', 0),
-            'letter1OffsetY': data.get('letter1BBox', {}).get('offsetY', 0),
-            'letter1OffsetZ': data.get('letter1BBox', {}).get('offsetZ', 0),
-            'letter2Width': data.get('letter2BBox', {}).get('width', 0),
-            'letter2Height': data.get('letter2BBox', {}).get('height', 0),
-            'letter2Depth': data.get('letter2BBox', {}).get('depth', 0),
-            'letter2OffsetX': data.get('letter2BBox', {}).get('offsetX', 0),
-            'letter2OffsetY': data.get('letter2BBox', {}).get('offsetY', 0),
-            'letter2OffsetZ': data.get('letter2BBox', {}).get('offsetZ', 0)
+            'bailRotation': data.get('bailRotation', 0)
         }
         
         scad_content = generate_scad_script(**params)
