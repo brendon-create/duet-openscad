@@ -40,7 +40,6 @@ try:
 except ImportError:
     GOOGLE_SHEETS_ENABLED = False
     logger.warning("⚠️ Google Sheets 模組未安裝，將跳過 Sheets 整合")
-logger = logging.getLogger(__name__)
 
 TEMP_DIR = tempfile.gettempdir()
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -74,51 +73,41 @@ GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Servi
 ORDERS_DIR = 'orders'
 STL_DIR = 'stl_files'
 QUEUE_DIR = 'stl_queue'
-ORDERS_FILE = os.path.join(ORDERS_DIR, 'orders.json')  # 持久化訂單資料
 os.makedirs(ORDERS_DIR, exist_ok=True)
 os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
 
 # ==========================================
-# 訂單資料管理
+# 訂單管理（獨立檔案儲存）
 # ==========================================
 
-# 訂單資料（記憶體中）
-orders = {}
-
-def load_orders():
-    """從檔案載入訂單資料"""
-    global orders
-    if os.path.exists(ORDERS_FILE):
-        try:
-            with open(ORDERS_FILE, 'r', encoding='utf-8') as f:
-                orders = json.load(f)
-            logger.info(f"📂 已載入 {len(orders)} 筆訂單")
-        except Exception as e:
-            logger.error(f"❌ 載入訂單失敗: {e}")
-            orders = {}
-    else:
-        orders = {}
-        logger.info("📂 初始化空訂單資料")
-
-def save_orders():
-    """儲存訂單資料到檔案"""
-    try:
-        with open(ORDERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(orders, f, ensure_ascii=False, indent=2)
-        logger.info(f"💾 已儲存 {len(orders)} 筆訂單")
-    except Exception as e:
-        logger.error(f"❌ 儲存訂單失敗: {e}")
-
 def save_order(order_id, order_data):
-    """儲存單筆訂單"""
-    orders[order_id] = order_data
-    save_orders()
+    """儲存訂單到獨立檔案"""
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(order_data, f, ensure_ascii=False, indent=2)
     logger.info(f"✅ 訂單已儲存: {order_id}")
 
-def get_order(order_id):
-    """取得訂單資料"""
-    return orders.get(order_id)
+def load_order(order_id):
+    """讀取訂單"""
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
+    if not os.path.exists(filepath):
+        return None
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def update_order_status(order_id, status, payment_data=None):
+    """更新訂單狀態"""
+    order = load_order(order_id)
+    if not order:
+        return False
+    order['status'] = status
+    order['updated_at'] = datetime.now().isoformat()
+    if payment_data:
+        order['payment_data'] = payment_data
+    save_order(order_id, order)
+    logger.info(f"📝 訂單狀態: {order_id} → {status}")
+    return True
 
 # ==========================================
 # Google Sheets 整合
@@ -399,38 +388,6 @@ def generate_and_send_stl(order_id):
         return False
 
 # ==========================================
-# 訂單管理
-# ==========================================
-
-def save_order(order_id, order_data):
-    """儲存訂單"""
-    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(order_data, f, ensure_ascii=False, indent=2)
-    logger.info(f"✅ 訂單已儲存: {order_id}")
-
-def load_order(order_id):
-    """讀取訂單"""
-    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
-    if not os.path.exists(filepath):
-        return None
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def update_order_status(order_id, status, payment_data=None):
-    """更新訂單狀態"""
-    order = load_order(order_id)
-    if not order:
-        return False
-    order['status'] = status
-    order['updated_at'] = datetime.now().isoformat()
-    if payment_data:
-        order['payment_data'] = payment_data
-    save_order(order_id, order)
-    logger.info(f"📝 訂單狀態: {order_id} → {status}")
-    return True
-
-# ==========================================
 # Email 系統（使用 Resend）
 # ==========================================
 
@@ -548,27 +505,31 @@ def generate_customer_email_html(order_data):
     <body>
         <div class="container">
             <div class="header">
-                <h1>✅ 訂單確認</h1>
-                <p>訂單編號: {order_data['orderId']}</p>
+                <h1>訂單確認</h1>
             </div>
-            <p>親愛的 {order_data['userInfo']['name']}，</p>
-            <p>感謝您的訂購！我們已收到您的訂單。</p>
-            <h3>訂購項目</h3>
+            <p>親愛的 {order_data['userInfo']['name']} 您好，</p>
+            <p>感謝您訂購 DUET 客製墜飾！您的訂單已確認。</p>
+            <h3>訂單編號：{order_data['orderId']}</h3>
             <table>
-                <tr>
-                    <th>#</th>
-                    <th>字母</th>
-                    <th>字體</th>
-                    <th>尺寸</th>
-                    <th>材質</th>
-                    <th>數量</th>
-                </tr>
-                {items_html}
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>字母組合</th>
+                        <th>字體</th>
+                        <th>尺寸</th>
+                        <th>材質</th>
+                        <th>數量</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
             </table>
-            <p><strong>訂單金額：NT$ {order_data['total']:,}</strong></p>
-            <p>我們將盡快為您製作實體產品。</p>
-            <p>DUET 客製珠寶 敬上</p>
-            <p style="color: #666; font-size: 12px;">此郵件由系統自動發送</p>
+            <h3>訂單總金額：NT$ {order_data['total']:,}</h3>
+            <p>我們將盡快為您製作產品，製作完成後會再次通知您。</p>
+            <p>如有任何問題，請隨時與我們聯繫。</p>
+            <p>祝您有美好的一天！</p>
+            <p>DUET 團隊 敬上</p>
         </div>
     </body>
     </html>
@@ -579,53 +540,61 @@ def generate_internal_order_email_html(order_data):
     """內部訂單通知 Email HTML"""
     items_html = ''
     for idx, item in enumerate(order_data['items'], 1):
-        bbox1 = item.get('letter1BBox', {})
-        bbox2 = item.get('letter2BBox', {})
         items_html += f'''
-        <div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px;">
-            <h3>項目 {idx}</h3>
-            <p><strong>字母：</strong>{item['letter1']} + {item['letter2']}</p>
-            <p><strong>字體：</strong>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</p>
-            <p><strong>尺寸：</strong>{item.get('size', 'N/A')} mm</p>
-            <p><strong>材質：</strong>{item.get('material', 'N/A')}</p>
-            <details>
-                <summary style="cursor: pointer; color: #666;">技術參數</summary>
-                <pre style="background: #f5f5f5; padding: 10px; font-size: 12px;">
-Letter1 BBox: W={bbox1.get('width', 0):.3f}, H={bbox1.get('height', 0):.3f}, D={bbox1.get('depth', 0):.3f}
-Letter2 BBox: W={bbox2.get('width', 0):.3f}, H={bbox2.get('height', 0):.3f}, D={bbox2.get('depth', 0):.3f}
-Bail: X={item.get('bailAbsoluteX', 0):.3f}, Y={item.get('bailAbsoluteY', 0):.3f}, Z={item.get('bailAbsoluteZ', 0):.3f}
-                </pre>
-            </details>
-        </div>
+        <tr>
+            <td>{idx}</td>
+            <td>{item['id']}</td>
+            <td>{item['letter1']} + {item['letter2']}</td>
+            <td>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</td>
+            <td>{item.get('size', 'N/A')} mm</td>
+            <td>{item.get('material', 'N/A')}</td>
+            <td>{item.get('quantity', 1)}</td>
+        </tr>
         '''
-    
-    test_warning = ''
-    if order_data.get('testMode'):
-        test_warning = '<div style="background: #fff3cd; padding: 15px; margin: 10px 0;">⚠️ 測試訂單</div>'
     
     html = f'''
     <!DOCTYPE html>
     <html>
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial, sans-serif;">
-        <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
-            <h1 style="background: #2c3e50; color: white; padding: 20px; text-align: center;">
-                🎉 新訂單通知
-            </h1>
-            {test_warning}
-            <h2>訂單資訊</h2>
-            <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
-            <p><strong>訂單時間：</strong>{order_data.get('timestamp', 'N/A')}</p>
-            <p><strong>訂單金額：</strong>NT$ {order_data['total']:,}</p>
-            <h2>👤 顧客資訊</h2>
-            <p><strong>姓名：</strong>{order_data['userInfo']['name']}</p>
-            <p><strong>Email：</strong>{order_data['userInfo']['email']}</p>
-            <p><strong>電話：</strong>{order_data['userInfo']['phone']}</p>
-            <h2>🎁 訂購項目</h2>
-            {items_html}
-            <p style="background: #e3f2fd; padding: 15px; margin: 20px 0;">
-                ⏳ STL 檔案製作中...
-            </p>
+    <head><meta charset="UTF-8"><style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 12px; }}
+        th {{ background: #f5f5f5; }}
+        .info {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+    </style></head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🆕 新訂單通知</h1>
+            </div>
+            <div class="info">
+                <h3>訂單編號：{order_data['orderId']}</h3>
+                <p><strong>顧客姓名：</strong>{order_data['userInfo']['name']}</p>
+                <p><strong>Email：</strong>{order_data['userInfo']['email']}</p>
+                <p><strong>電話：</strong>{order_data['userInfo']['phone']}</p>
+                <p><strong>訂單總金額：</strong>NT$ {order_data['total']:,}</p>
+                <p><strong>訂單時間：</strong>{order_data.get('timestamp', 'N/A')}</p>
+            </div>
+            <h3>訂單明細：</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>ID</th>
+                        <th>字母組合</th>
+                        <th>字體</th>
+                        <th>尺寸</th>
+                        <th>材質</th>
+                        <th>數量</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
+            <p><strong>注意：</strong>STL 檔案生成完成後會另外發送。</p>
         </div>
     </body>
     </html>
@@ -633,28 +602,55 @@ Bail: X={item.get('bailAbsoluteX', 0):.3f}, Y={item.get('bailAbsoluteY', 0):.3f}
     return html
 
 def generate_internal_stl_email_html(order_data):
-    """內部 STL 完成 Email HTML"""
-    items_list = '<ul>'
-    for item in order_data['items']:
-        items_list += f'<li>{item["letter1"]} + {item["letter2"]} ({item.get("size", "N/A")} mm)</li>'
-    items_list += '</ul>'
+    """內部 STL 完成通知 Email HTML"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        items_html += f'''
+        <tr>
+            <td>{idx}</td>
+            <td>{item['id']}.stl</td>
+            <td>{item['letter1']} + {item['letter2']}</td>
+            <td>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</td>
+        </tr>
+        '''
     
     html = f'''
     <!DOCTYPE html>
     <html>
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: Arial, sans-serif;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h1 style="background: #2196F3; color: white; padding: 20px; text-align: center;">
-                ✅ STL 檔案已完成
-            </h1>
-            <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
-            <h2>📋 項目清單</h2>
-            {items_list}
-            <div style="background: #fff3cd; padding: 15px; margin: 20px 0;">
-                <p><strong>📎 附件</strong></p>
-                <p>STL 檔案已附加在此郵件中。</p>
+    <head><meta charset="UTF-8"><style>
+        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
+        th {{ background: #f5f5f5; }}
+        .info {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+    </style></head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>✅ STL 檔案已完成</h1>
             </div>
+            <div class="info">
+                <h3>訂單編號：{order_data['orderId']}</h3>
+                <p><strong>顧客姓名：</strong>{order_data['userInfo']['name']}</p>
+                <p><strong>訂單總金額：</strong>NT$ {order_data['total']:,}</p>
+            </div>
+            <h3>STL 檔案列表：</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>項目</th>
+                        <th>檔案名稱</th>
+                        <th>字母組合</th>
+                        <th>字體</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
+            <p><strong>所有 STL 檔案已附加在此郵件中，請下載後進行生產。</strong></p>
         </div>
     </body>
     </html>
@@ -662,210 +658,95 @@ def generate_internal_stl_email_html(order_data):
     return html
 
 # ==========================================
-# 原有的 STL 生成端點（保留）
+# STL 生成 API
 # ==========================================
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    try:
-        result = subprocess.run(['which', 'openscad'], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            openscad_path = result.stdout.strip()
-            version_result = subprocess.run(['openscad', '--version'], 
-                                          capture_output=True, text=True, timeout=5,
-                                          env={'DISPLAY': ':99'})
-            version_info = version_result.stdout.strip() or version_result.stderr.strip() or "Installed"
-            openscad_status = f"{openscad_path} - {version_info}"
-        else:
-            openscad_status = "Not found"
-    except Exception as e:
-        openscad_status = f"Error: {str(e)}"
-    
-    queue_items = get_pending_queue_items()
-    
-    return jsonify({
-        'status': 'healthy',
-        'openscad': openscad_status,
-        'payment_enabled': True,
-        'email_enabled': True,
-        'email_service': 'Resend',
-        'queue_system': True,
-        'pending_stl_jobs': len(queue_items)
-    })
-
-def get_available_fonts():
-    try:
-        result = subprocess.run(['fc-list'], capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            return set()
-        
-        font_families = set()
-        for line in result.stdout.strip().split('\n'):
-            if line and ':' in line:
-                parts = line.split(':', 1)
-                if len(parts) >= 2:
-                    font_info = parts[1].strip()
-                    if ':style=' in font_info:
-                        font_name = font_info.split(':style=')[0].strip()
-                    else:
-                        font_name = font_info.strip()
-                    for name in font_name.split(','):
-                        clean_name = name.strip()
-                        if clean_name:
-                            font_families.add(clean_name)
-        return font_families
-    except:
-        return set()
-
-def validate_font(font_name):
-    available_fonts = get_available_fonts()
-    if not available_fonts:
-        raise ValueError("Cannot get system fonts")
-    if font_name not in available_fonts:
-        raise ValueError(f"Font '{font_name}' not found")
-    return font_name
-
-@app.route('/list-fonts', methods=['GET'])
-def list_fonts():
-    try:
-        result = subprocess.run(['fc-list'], capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            return jsonify({'error': 'Failed to list fonts'}), 500
-        
-        font_families = set()
-        for line in result.stdout.strip().split('\n'):
-            if line and ':' in line:
-                parts = line.split(':', 1)
-                if len(parts) >= 2:
-                    font_info = parts[1].strip()
-                    if ':style=' in font_info:
-                        font_name = font_info.split(':style=')[0].strip()
-                    else:
-                        font_name = font_info.strip()
-                    for family in font_name.split(','):
-                        clean_name = family.strip()
-                        if clean_name:
-                            font_families.add(clean_name)
-        
-        sorted_fonts = sorted(font_families)
-        return jsonify({'fonts': sorted_fonts, 'total': len(sorted_fonts)})
-    except:
-        return jsonify({'error': 'Internal server error'}), 500
-
-@app.route('/generate', methods=['POST'])
+@app.route('/api/generate-stl', methods=['POST'])
 def generate_stl():
-    """原有的即時 STL 生成端點"""
+    """生成 STL"""
     try:
         data = request.json
+        logger.info(f"🔨 收到 STL 生成請求")
         
-        letter1 = data.get('letter1', 'D')
-        letter2 = data.get('letter2', 'T')
-        font1 = data.get('font1', 'Roboto')
-        font2 = data.get('font2', 'Roboto')
-        size = data.get('size', 20)
+        params = {
+            'letter1': data['letter1'],
+            'letter2': data['letter2'],
+            'font1': data['font1'],
+            'font2': data['font2'],
+            'size': data.get('size', 15),
+            'bailRelativeX': data.get('bailRelativeX', 0),
+            'bailRelativeY': data.get('bailRelativeY', 0),
+            'bailRelativeZ': data.get('bailRelativeZ', 0),
+            'bailRotation': data.get('bailRotation', 0),
+            'bailAbsoluteX': data.get('bailAbsoluteX', 0),
+            'bailAbsoluteY': data.get('bailAbsoluteY', 0),
+            'bailAbsoluteZ': data.get('bailAbsoluteZ', 0),
+            'letter1Width': data.get('letter1BBox', {}).get('width', 0),
+            'letter1Height': data.get('letter1BBox', {}).get('height', 0),
+            'letter1Depth': data.get('letter1BBox', {}).get('depth', 0),
+            'letter1OffsetX': data.get('letter1BBox', {}).get('offsetX', 0),
+            'letter1OffsetY': data.get('letter1BBox', {}).get('offsetY', 0),
+            'letter1OffsetZ': data.get('letter1BBox', {}).get('offsetZ', 0),
+            'letter2Width': data.get('letter2BBox', {}).get('width', 0),
+            'letter2Height': data.get('letter2BBox', {}).get('height', 0),
+            'letter2Depth': data.get('letter2BBox', {}).get('depth', 0),
+            'letter2OffsetX': data.get('letter2BBox', {}).get('offsetX', 0),
+            'letter2OffsetY': data.get('letter2BBox', {}).get('offsetY', 0),
+            'letter2OffsetZ': data.get('letter2BBox', {}).get('offsetZ', 0)
+        }
         
-        if 'bailRelativeX' in data:
-            bailRelativeX = data.get('bailRelativeX', 0)
-            bailRelativeY = data.get('bailRelativeY', 0)
-            bailRelativeZ = data.get('bailRelativeZ', 0)
-            bailRotation = data.get('bailRotation', 0)
-        elif 'bailX' in data:
-            bailRelativeX = data.get('bailX', 0)
-            bailRelativeY = data.get('bailY', 0)
-            bailRelativeZ = data.get('bailZ', 0)
-            bailRotation = data.get('bailRotation', 0)
-        else:
-            pendant_config = data.get('pendant', {})
-            bailRelativeX = pendant_config.get('x', 0)
-            bailRelativeY = pendant_config.get('y', 0)
-            bailRelativeZ = pendant_config.get('z', 0)
-            bailRotation = pendant_config.get('rotation_y', 0)
-        
-        bailAbsoluteX = data.get('bailAbsoluteX', 0)
-        bailAbsoluteY = data.get('bailAbsoluteY', 0)
-        bailAbsoluteZ = data.get('bailAbsoluteZ', 0)
-        
-        letter1Width = data.get('letter1Width', 0)
-        letter1Height = data.get('letter1Height', 0)
-        letter1Depth = data.get('letter1Depth', 0)
-        letter1OffsetX = data.get('letter1OffsetX', 0)
-        letter1OffsetY = data.get('letter1OffsetY', 0)
-        letter1OffsetZ = data.get('letter1OffsetZ', 0)
-        
-        letter2Width = data.get('letter2Width', 0)
-        letter2Height = data.get('letter2Height', 0)
-        letter2Depth = data.get('letter2Depth', 0)
-        letter2OffsetX = data.get('letter2OffsetX', 0)
-        letter2OffsetY = data.get('letter2OffsetY', 0)
-        letter2OffsetZ = data.get('letter2OffsetZ', 0)
-        
-        font1 = validate_font(font1)
-        font2 = validate_font(font2)
-        
-        scad_content = generate_scad_script(
-            letter1=letter1, letter2=letter2, font1=font1, font2=font2, size=size,
-            bailRelativeX=bailRelativeX, bailRelativeY=bailRelativeY, bailRelativeZ=bailRelativeZ,
-            bailRotation=bailRotation, bailAbsoluteX=bailAbsoluteX, bailAbsoluteY=bailAbsoluteY,
-            bailAbsoluteZ=bailAbsoluteZ, letter1Width=letter1Width, letter1Height=letter1Height,
-            letter1Depth=letter1Depth, letter1OffsetX=letter1OffsetX, letter1OffsetY=letter1OffsetY,
-            letter1OffsetZ=letter1OffsetZ, letter2Width=letter2Width, letter2Height=letter2Height,
-            letter2Depth=letter2Depth, letter2OffsetX=letter2OffsetX, letter2OffsetY=letter2OffsetY,
-            letter2OffsetZ=letter2OffsetZ
-        )
+        scad_content = generate_scad_script(**params)
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
             scad_file.write(scad_content)
             scad_path = scad_file.name
         
         stl_path = scad_path.replace('.scad', '.stl')
+        
         cmd = ['openscad', '-o', stl_path, '--export-format', 'binstl', scad_path]
+        
         env = os.environ.copy()
         env['DISPLAY'] = ':99'
         
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
         
+        try:
+            os.unlink(scad_path)
+        except:
+            pass
+        
         if result.returncode != 0:
-            return jsonify({'error': 'OpenSCAD execution failed'}), 500
+            logger.error(f"❌ OpenSCAD 錯誤: {result.stderr}")
+            return jsonify({'success': False, 'error': result.stderr}), 500
         
         if not os.path.exists(stl_path):
-            return jsonify({'error': 'STL file not generated'}), 500
+            logger.error("❌ STL 檔案不存在")
+            return jsonify({'success': False, 'error': 'STL file not generated'}), 500
         
-        response = send_file(stl_path, mimetype='application/octet-stream',
-                           as_attachment=True, download_name=f'{letter1}{letter2}_DUET.stl')
+        logger.info(f"✅ STL 生成成功: {stl_path}")
         
-        @response.call_on_close
-        def cleanup():
-            try:
-                os.unlink(scad_path)
-                os.unlink(stl_path)
-            except:
-                pass
+        return send_file(stl_path, as_attachment=True, download_name=f"{data['letter1']}_{data['letter2']}.stl")
         
-        return response
     except Exception as e:
-        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+        logger.error(f"❌ STL 生成錯誤: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
-# 金流 API
+# 綠界金流
 # ==========================================
 
 def prepare_custom_fields(order_data):
-    """準備綠界 CustomField（訂單備份）"""
+    """準備 CustomField（訂單備份到綠界）"""
     try:
-        user_info = order_data.get('userInfo', {})
         items = order_data.get('items', [])
-        
-        # CustomField1: 關鍵資訊 (~60字)
         field1 = json.dumps({
-            "O": order_data.get('orderId', ''),
-            "N": user_info.get('name', ''),
-            "E": user_info.get('email', ''),
-            "P": user_info.get('phone', ''),
-            "I": len(items),
-            "T": order_data.get('total', 0)
+            'id': order_data.get('orderId', ''),
+            'name': order_data.get('userInfo', {}).get('name', ''),
+            'email': order_data.get('userInfo', {}).get('email', ''),
+            'phone': order_data.get('userInfo', {}).get('phone', ''),
+            'total': order_data.get('total', 0)
         }, ensure_ascii=False)[:200]
         
-        # CustomField2-4: 各物件參數（每個~100字）
         def compress_item(item):
             return json.dumps({
                 "L1": item.get('letter1', ''),
@@ -994,7 +875,7 @@ def payment_callback():
 def process_order_after_payment(order_id, payment_data):
     """付款成功後處理訂單（非同步）"""
     try:
-        order = get_order(order_id)
+        order = load_order(order_id)
         if not order:
             logger.error(f"❌ 找不到訂單: {order_id}")
             return False
@@ -1094,6 +975,15 @@ def payment_success():
     <a href="/" class="btn">返回首頁</a></div></body></html>'''
 
 # ==========================================
+# 健康檢查
+# ==========================================
+
+@app.route('/health')
+def health():
+    """健康檢查"""
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
+
+# ==========================================
 # 初始化（Gunicorn 會執行這裡）
 # ==========================================
 
@@ -1102,9 +992,6 @@ logger.info(f"📧 Email 服務: Resend")
 logger.info(f"📧 發件人: {SENDER_EMAIL}")
 logger.info(f"📧 內部收件: {INTERNAL_EMAIL}")
 logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
-
-# 載入訂單資料
-load_orders()
 
 # 啟動背景 Worker
 start_background_worker()
