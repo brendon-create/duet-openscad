@@ -727,9 +727,10 @@ def prepare_custom_fields(order_data):
                 "F2": item.get('font2', ''),
                 "S": item.get('size', 15),
                 "M": item.get('material', '金'),
-                "BX": item.get('bailAbsoluteX', 0),
-                "BY": item.get('bailAbsoluteY', 0),
-                "BZ": item.get('bailAbsoluteZ', 0)
+                "RX": item.get('bailRelativeX', 0),    # 改用 bailRelative
+                "RY": item.get('bailRelativeY', 0),
+                "RZ": item.get('bailRelativeZ', 0),
+                "ROT": item.get('bailRotation', 0)      # 加入 bailRotation
             }, ensure_ascii=False)[:200]
         
         field2 = compress_item(items[0]) if len(items) > 0 else ''
@@ -818,6 +819,12 @@ def payment_callback():
     try:
         data = request.form.to_dict()
         logger.info(f"📥 收到綠界回調: {data.get('MerchantTradeNo')}")
+        
+        # ✅ 詳細記錄 CustomField 內容（用於測試）
+        logger.info(f"📦 CustomField1: {data.get('CustomField1', '(empty)')}")
+        logger.info(f"📦 CustomField2: {data.get('CustomField2', '(empty)')}")
+        logger.info(f"📦 CustomField3: {data.get('CustomField3', '(empty)')}")
+        logger.info(f"📦 CustomField4: {data.get('CustomField4', '(empty)')}")
         
         received_check_mac = data.pop('CheckMacValue', '')
         calculated_check_mac = generate_check_mac_value(data, 
@@ -945,6 +952,51 @@ def payment_success():
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>我們將盡快為您製作產品。</p>
     <a href="/" class="btn">返回首頁</a></div></body></html>'''
+
+# ==========================================
+# 測試端點
+# ==========================================
+
+@app.route('/api/test-custom-fields', methods=['POST'])
+def test_custom_fields():
+    """測試 CustomField 生成結果"""
+    try:
+        data = request.json
+        logger.info("🧪 測試 CustomField 生成")
+        
+        custom_fields = prepare_custom_fields(data)
+        
+        # 解析並美化顯示
+        import json as json_lib
+        result = {}
+        for key, value in custom_fields.items():
+            try:
+                parsed = json_lib.loads(value) if value else {}
+                result[key] = {
+                    'raw': value,
+                    'parsed': parsed,
+                    'length': len(value)
+                }
+            except:
+                result[key] = {
+                    'raw': value,
+                    'parsed': None,
+                    'length': len(value) if value else 0
+                }
+        
+        logger.info(f"✅ CustomField1 長度: {result['CustomField1']['length']}/200")
+        logger.info(f"✅ CustomField2 長度: {result['CustomField2']['length']}/200")
+        logger.info(f"✅ CustomField3 長度: {result['CustomField3']['length']}/200")
+        logger.info(f"✅ CustomField4 長度: {result['CustomField4']['length']}/200")
+        
+        return jsonify({
+            'success': True,
+            'customFields': result
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ 測試錯誤: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
 # 健康檢查
