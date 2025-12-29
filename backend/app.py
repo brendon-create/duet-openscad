@@ -14,7 +14,13 @@ from threading import Thread, Lock
 # ==========================================
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 logging.basicConfig(
     level=logging.INFO,
@@ -370,6 +376,63 @@ def download_order(order_id):
     except Exception as e:
         logger.error(f"下載訂單錯誤: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test-order', methods=['POST', 'OPTIONS'])
+def test_order():
+    """測試模式訂單處理 - 前端 checkout 測試用"""
+    # 處理 CORS preflight
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.json
+        order_id = data.get('orderId')
+        items = data.get('items', [])
+        user_info = data.get('userInfo', {})
+        test_mode = data.get('testMode', False)
+        
+        logger.info(f"📦 收到測試訂單: {order_id}, 共 {len(items)} 件商品")
+        
+        if not items:
+            return jsonify({'success': False, 'error': '購物車是空的'}), 400
+        
+        # 準備批次生成的參數
+        batch_items = []
+        for item in items:
+            batch_items.append({
+                'letter1': item.get('letter1'),
+                'letter2': item.get('letter2'),
+                'font1': item.get('font1'),
+                'font2': item.get('font2'),
+                'size': item.get('size'),
+                'bailRelativeX': item.get('bailRelativeX', 0),
+                'bailRelativeY': item.get('bailRelativeY', 0),
+                'bailRelativeZ': item.get('bailRelativeZ', 0),
+                'bailRotation': item.get('bailRotation', 0)
+            })
+        
+        # 添加到隊列
+        with queue_lock:
+            stl_queue.append((order_id, batch_items))
+            queue_results[order_id] = {
+                'status': 'processing',
+                'files': [],
+                'errors': []
+            }
+        
+        logger.info(f"✅ 測試訂單 {order_id} 已加入處理隊列")
+        
+        return jsonify({
+            'success': True,
+            'orderId': order_id,
+            'message': f'訂單已提交，共 {len(items)} 件商品正在生成中',
+            'checkUrl': f'/check-order/{order_id}',
+            'downloadUrl': f'/download-order/{order_id}'
+        })
+        
+    except Exception as e:
+        logger.error(f"測試訂單處理錯誤: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
 # 主程序
