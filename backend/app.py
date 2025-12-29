@@ -48,6 +48,9 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # 配置
 # ==========================================
 
+# 版本號
+APP_VERSION = "1.0.0-stable"
+
 # 綠界配置
 ECPAY_CONFIG = {
     'MerchantID': '3317971',
@@ -1005,7 +1008,11 @@ def test_custom_fields():
 @app.route('/health')
 def health():
     """健康檢查"""
-    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
+    return jsonify({
+        'status': 'ok',
+        'version': APP_VERSION,
+        'timestamp': datetime.now().isoformat()
+    })
 
 # ==========================================
 # 初始化（Gunicorn 會執行這裡）
