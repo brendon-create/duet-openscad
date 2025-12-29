@@ -3,11 +3,9 @@ def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, ba
     生成與前端 Z-Up 系統完全一致的 OpenSCAD 腳本
     
     關鍵修正：
-    1. Letter 2 旋轉順序匹配前端
-    2. 使用相對向量定位墜頭：墜頭位置 = 主體中心 + 相對向量
-    3. 使用 resize() 確保精確高度
-    4. union() 確保無破面
-    5. 字體名稱由後端嚴格驗證，直接使用
+    1. 在 2D 階段使用 scale() 調整文字大小，而不是在 3D 物件上用 resize()
+    2. 確保主物件和墜頭在同一比例尺下
+    3. 統一旋轉邏輯與前端一致
     """
     
     if size <= 20:
@@ -17,23 +15,31 @@ def generate_scad_script(letter1, letter2, font1, font2, size, bailRelativeX, ba
     else:
         fn = 48
     
+    # 深度保持為 size 的 5 倍
     depth = size * 5.0
+    
+    # 墜頭尺寸
     bail_radius = 1.85
     bail_tube = 0.35
     
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🔧 收到相對向量: X={bailRelativeX}, Y={bailRelativeY}, Z={bailRelativeZ}, Rotation={bailRotation}")
+    logger.info(f"🔧 收到參數: size={size}, bailRelativeX={bailRelativeX}, bailRelativeY={bailRelativeY}, bailRelativeZ={bailRelativeZ}, bailRotation={bailRotation}")
     
     # 墜頭位置 = 主體中心 + 相對向量
-    # 在 OpenSCAD 中，主體使用 halign="center", valign="center"，所以中心點在原點 (0, 0, 0)
     pos_x = 0 + bailRelativeX
     pos_y = 0 + bailRelativeY
     pos_z = 0 + bailRelativeZ
-    # 前端墜頭有初始 90° 旋轉（geometry.rotateZ(Math.PI/2)），後端需要加上這個偏移
+    
+    # 前端墜頭有初始 90° 旋轉
     bail_rotation_deg = bailRotation + 90
     
-    scad_script = f'''// DUET Z-Up System
+    # ✅ 關鍵修正：計算縮放比例，作用在 2D text 上
+    # OpenSCAD text(size=10) 約等於 Three.js TextGeometry(size=15)
+    # 因此需要縮放 size/10
+    text_scale = size / 10.0
+    
+    scad_script = f'''// DUET Z-Up System - 修正版
 $fn = {fn};
 
 letter1 = "{letter1}";
@@ -42,6 +48,7 @@ font1 = "{font1}";
 font2 = "{font2}";
 target_height = {size};
 depth = {depth};
+text_scale = {text_scale};
 bail_radius = {bail_radius};
 bail_tube = {bail_tube};
 pos_x = {pos_x};
@@ -51,22 +58,22 @@ bail_rotation = {bail_rotation_deg};
 
 module letter1_shape() {{
     rotate([90, 0, 0])
-        resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
-            linear_extrude(height=depth, center=true)
-                text(letter1, font=font1, halign="center", valign="center");
+        linear_extrude(height=depth, center=true)
+            scale([text_scale, text_scale, 1])  // ✅ 在 2D 階段縮放
+                text(letter1, font=font1, size=10, halign="center", valign="center");
 }}
 
 module letter2_shape() {{
-    rotate([0, 0, 90])  // 外層（後執行）：Z 軸旋轉
-        rotate([90, 0, 0])  // 內層（先執行）：X 軸旋轉
-            resize([0, 0, target_height], auto=true)  // 對 3D 物件 resize
-                linear_extrude(height=depth, center=true)
-                    text(letter2, font=font2, halign="center", valign="center");
+    rotate([0, 0, 90])
+        rotate([90, 0, 0])
+            linear_extrude(height=depth, center=true)
+                scale([text_scale, text_scale, 1])  // ✅ 在 2D 階段縮放
+                    text(letter2, font=font2, size=10, halign="center", valign="center");
 }}
 
 module bail() {{
     translate([pos_x, pos_y, pos_z])
-        rotate([0, 0, bail_rotation])  // 用戶旋轉
+        rotate([0, 0, bail_rotation])
             rotate([90, 0, 0])
                 rotate_extrude(angle=360, $fn=32)
                     translate([bail_radius, 0, 0])
@@ -81,9 +88,10 @@ union() {{
     bail();
 }}
 '''
-    # Debug: 輸出生成的 SCAD 內容（前 50 行）
+    
     logger.info("📄 Generated SCAD content (first 50 lines):")
     lines = scad_script.split('\n')
     for i, line in enumerate(lines[:50], 1):
         logger.info(f"  {i:3}: {line}")
+    
     return scad_script
