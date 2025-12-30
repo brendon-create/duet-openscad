@@ -50,9 +50,9 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 # 綠界配置
 ECPAY_CONFIG = {
-    'MerchantID': '3317971',
-    'HashKey': 'MN7lld33ls2A7ACQ',
-    'HashIV': 'JsQNlwsz3QtbVKIq',
+    'MerchantID': '2000132',  # ✅ 綠界官方測試商店代號
+    'HashKey': 'pwFHCqoQZGmho4w6',  # ✅ 測試 HashKey
+    'HashIV': 'EkRm7iFT261dpevs',  # ✅ 測試 HashIV
     'PaymentURL': 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'  # ✅ 測試站
 }
 
