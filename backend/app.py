@@ -48,9 +48,6 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 # 配置
 # ==========================================
 
-# 版本號
-APP_VERSION = "1.0.0-stable"
-
 # 綠界配置
 ECPAY_CONFIG = {
     'MerchantID': '3317971',
@@ -68,9 +65,20 @@ INTERNAL_EMAIL = 'brendon@brendonchen.com'
 # 設定 Resend API Key
 resend.api_key = RESEND_API_KEY
 
-# Google Sheets 配置（選用）
-GOOGLE_SHEETS_ID = os.environ.get('GOOGLE_SHEETS_ID', '')  # 從環境變數讀取
+# Google Sheets 配置（優惠碼管理）
+GOOGLE_SHEETS_CONFIG = {
+    'enabled': os.environ.get('GOOGLE_SHEETS_ENABLED', 'false').lower() == 'true',
+    'sheet_id': os.environ.get('PROMO_SHEET_ID', ''),
+    'range_name': 'Sheet1!A2:I',  # 從第2列開始（第1列是標題）
+    'cache_duration': 3600,  # 快取 1 小時
+}
 GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
+
+# 優惠碼快取
+PROMO_CODES_CACHE = {
+    'data': {},
+    'last_updated': None
+}
 
 # 目錄配置
 ORDERS_DIR = 'orders'
@@ -79,6 +87,183 @@ QUEUE_DIR = 'stl_queue'
 os.makedirs(ORDERS_DIR, exist_ok=True)
 os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
+
+# ==========================================
+# 優惠碼系統
+# ==========================================
+
+# 預設優惠碼（Fallback，當 Google Sheets 不可用時）
+PROMO_CODES = {
+    'VIP10': {
+        'type': 'percentage',
+        'value': 10,
+        'description': 'VIP 9折優惠',
+        'validUntil': '2025-12-31',
+        'minAmount': 3000,
+        'active': True
+    },
+    'NEWYEAR2025': {
+        'type': 'percentage',
+        'value': 15,
+        'description': '新年特惠 85折',
+        'validUntil': '2025-01-31',
+        'minAmount': 5000,
+        'active': True
+    },
+    'WELCOME500': {
+        'type': 'fixed',
+        'value': 500,
+        'description': '新客戶折 $500',
+        'validUntil': '2025-12-31',
+        'minAmount': 2000,
+        'active': True
+    },
+    'CELEB_ALICE20': {
+        'type': 'percentage',
+        'value': 20,
+        'description': 'Alice 專屬 8折優惠',
+        'validUntil': '2025-06-30',
+        'minAmount': 0,
+        'active': True
+    }
+}
+
+def load_promo_codes_from_sheets():
+    """從 Google Sheets 載入優惠碼"""
+    global PROMO_CODES_CACHE
+    
+    # 檢查是否啟用 Google Sheets
+    if not GOOGLE_SHEETS_CONFIG['enabled']:
+        logger.info("📊 Google Sheets 未啟用，使用預設優惠碼")
+        return PROMO_CODES
+    
+    # 檢查快取是否有效（1小時內）
+    if PROMO_CODES_CACHE['last_updated']:
+        cache_age = (datetime.now() - PROMO_CODES_CACHE['last_updated']).total_seconds()
+        if cache_age < GOOGLE_SHEETS_CONFIG['cache_duration']:
+            logger.info(f"📊 使用快取的優惠碼（{int(cache_age)}秒前更新）")
+            return PROMO_CODES_CACHE['data']
+    
+    try:
+        logger.info("📊 從 Google Sheets 載入優惠碼...")
+        
+        # 載入憑證
+        if not GOOGLE_CREDENTIALS_JSON:
+            logger.warning("⚠️ Google Sheets 憑證未設定，使用預設優惠碼")
+            return PROMO_CODES
+        
+        if GOOGLE_SHEETS_ENABLED:
+            import json
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            
+            # 解析憑證
+            creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+            credentials = service_account.Credentials.from_service_account_info(
+                creds_dict,
+                scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+            )
+            
+            # 建立 Sheets API 服務
+            service = build('sheets', 'v4', credentials=credentials)
+            sheet = service.spreadsheets()
+            
+            # 讀取資料
+            result = sheet.values().get(
+                spreadsheetId=GOOGLE_SHEETS_CONFIG['sheet_id'],
+                range=GOOGLE_SHEETS_CONFIG['range_name']
+            ).execute()
+            
+            values = result.get('values', [])
+            
+            if not values:
+                logger.warning("⚠️ Google Sheets 沒有資料，使用預設優惠碼")
+                return PROMO_CODES
+            
+            # 解析資料
+            promo_codes = {}
+            for row in values:
+                if len(row) < 7:  # 至少需要 7 個欄位
+                    continue
+                
+                code = row[0].strip().upper()
+                if not code:
+                    continue
+                
+                promo_codes[code] = {
+                    'type': row[1].lower() if len(row) > 1 else 'percentage',
+                    'value': float(row[2]) if len(row) > 2 else 0,
+                    'minAmount': float(row[3]) if len(row) > 3 else 0,
+                    'validUntil': row[5] if len(row) > 5 else '2099-12-31',
+                    'active': row[6].upper() == 'TRUE' if len(row) > 6 else True,
+                    'description': row[7] if len(row) > 7 else '',
+                }
+            
+            # 更新快取
+            PROMO_CODES_CACHE['data'] = promo_codes
+            PROMO_CODES_CACHE['last_updated'] = datetime.now()
+            
+            logger.info(f"✅ 已載入 {len(promo_codes)} 個優惠碼")
+            return promo_codes
+            
+    except Exception as e:
+        logger.error(f"❌ 從 Google Sheets 載入優惠碼失敗: {e}")
+        logger.info("📊 使用預設優惠碼")
+        return PROMO_CODES
+
+def validate_promo_code(promo_code, original_total):
+    """
+    驗證優惠碼並計算折扣金額
+    
+    Returns:
+        tuple: (is_valid, discount_amount, promo_info, error_message)
+    """
+    if not promo_code:
+        return False, 0, None, None
+    
+    code = promo_code.upper().strip()
+    
+    # 動態載入優惠碼（會使用快取）
+    promo_codes = load_promo_codes_from_sheets()
+    
+    # 檢查優惠碼是否存在
+    if code not in promo_codes:
+        return False, 0, None, '無效的優惠碼'
+    
+    promo = promo_codes[code]
+    
+    # 檢查是否啟用
+    if not promo.get('active', False):
+        return False, 0, None, '此優惠碼已失效'
+    
+    # 檢查有效期限
+    valid_until = promo.get('validUntil')
+    if valid_until:
+        try:
+            expiry_date = datetime.strptime(valid_until, '%Y-%m-%d')
+            if datetime.now() > expiry_date:
+                return False, 0, None, '此優惠碼已過期'
+        except:
+            pass
+    
+    # 檢查最低消費金額
+    min_amount = promo.get('minAmount', 0)
+    if original_total < min_amount:
+        return False, 0, None, f'此優惠碼需滿 NT$ {min_amount:,} 才可使用'
+    
+    # 計算折扣
+    discount = 0
+    if promo['type'] == 'percentage':
+        discount = int(original_total * promo['value'] / 100)
+    elif promo['type'] == 'fixed':
+        discount = promo['value']
+    
+    # 確保折扣不超過總金額
+    discount = min(discount, original_total)
+    
+    logger.info(f"✅ 優惠碼驗證成功: {code}, 折扣: NT$ {discount}")
+    
+    return True, discount, promo, None
 
 # ==========================================
 # 訂單管理（獨立檔案儲存）
@@ -750,6 +935,36 @@ def prepare_custom_fields(order_data):
         logger.error(f"❌ 準備 CustomField 失敗: {e}")
         return {}
 
+@app.route('/api/validate-promo', methods=['POST'])
+def validate_promo():
+    """驗證優惠碼（前端即時驗證用）"""
+    try:
+        data = request.json
+        promo_code = data.get('promoCode', '')
+        total = data.get('total', 0)
+        
+        is_valid, discount, promo_info, error_msg = validate_promo_code(promo_code, total)
+        
+        if is_valid:
+            return jsonify({
+                'success': True,
+                'valid': True,
+                'discount': discount,
+                'finalTotal': total - discount,
+                'description': promo_info.get('description', ''),
+                'discountType': promo_info.get('type', '')
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'valid': False,
+                'error': error_msg
+            })
+            
+    except Exception as e:
+        logger.error(f"❌ 優惠碼驗證錯誤: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def generate_check_mac_value(params, hash_key, hash_iv):
     """產生綠界 CheckMacValue"""
     sorted_params = sorted(params.items())
@@ -767,14 +982,34 @@ def checkout():
         logger.info(f"💳 收到結帳請求: {data.get('orderId')}")
         
         order_id = data['orderId']
-        total = data['total']
+        original_total = data['total']
         items = data['items']
         user_info = data['userInfo']
+        promo_code = data.get('promoCode', '')
         return_url = data.get('returnUrl', request.host_url + 'payment-success')
+        
+        # ✅ 後端驗證優惠碼（安全性必須）
+        is_valid, discount, promo_info, error_msg = validate_promo_code(promo_code, original_total)
+        
+        if promo_code and not is_valid:
+            logger.warning(f"❌ 優惠碼驗證失敗: {promo_code}, 原因: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': error_msg or '優惠碼無效'
+            }), 400
+        
+        # 計算最終金額
+        final_total = original_total - discount
+        
+        logger.info(f"💰 原始金額: NT$ {original_total}, 折扣: NT$ {discount}, 最終金額: NT$ {final_total}")
         
         order_data = {
             'orderId': order_id,
-            'total': total,
+            'originalTotal': original_total,  # 記錄原始金額
+            'discount': discount,             # 記錄折扣金額
+            'total': final_total,             # 最終付款金額
+            'promoCode': promo_code if is_valid else '',  # 記錄使用的優惠碼
+            'promoDescription': promo_info.get('description', '') if promo_info else '',
             'items': items,
             'userInfo': user_info,
             'status': 'pending',
@@ -791,7 +1026,7 @@ def checkout():
             'MerchantTradeNo': order_id,
             'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
             'PaymentType': 'aio',
-            'TotalAmount': str(total),
+            'TotalAmount': str(final_total),  # ✅ 使用折扣後的金額
             'TradeDesc': 'DUET客製墜飾',
             'ItemName': f"客製墜飾 x {len(items)}",
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
@@ -812,8 +1047,15 @@ def checkout():
         
         logger.info(f"✅ 綠界表單已生成，包含 CustomField 備份")
         
-        return jsonify({'success': True, 'paymentFormHTML': form_html, 'orderId': order_id})
+        return jsonify({
+            'success': True,
+            'paymentFormHTML': form_html,
+            'orderId': order_id,
+            'finalTotal': final_total,  # 返回最終金額給前端確認
+            'discount': discount
+        })
     except Exception as e:
+        logger.error(f"❌ 結帳錯誤: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/payment/callback', methods=['POST'])
@@ -1008,11 +1250,7 @@ def test_custom_fields():
 @app.route('/health')
 def health():
     """健康檢查"""
-    return jsonify({
-        'status': 'ok',
-        'version': APP_VERSION,
-        'timestamp': datetime.now().isoformat()
-    })
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
 
 # ==========================================
 # 初始化（Gunicorn 會執行這裡）
