@@ -89,44 +89,17 @@ os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
 
 # ==========================================
-# 優惠碼系統
+# 優惠碼系統（完全使用 Google Sheets）
 # ==========================================
 
-# 預設優惠碼（Fallback，當 Google Sheets 不可用時）
-PROMO_CODES = {
-    'VIP10': {
-        'type': 'percentage',
-        'value': 10,
-        'description': 'VIP 9折優惠',
-        'validUntil': '2025-12-31',
-        'minAmount': 3000,
-        'active': True
-    },
-    'NEWYEAR2025': {
-        'type': 'percentage',
-        'value': 15,
-        'description': '新年特惠 85折',
-        'validUntil': '2025-01-31',
-        'minAmount': 5000,
-        'active': True
-    },
-    'WELCOME500': {
-        'type': 'fixed',
-        'value': 500,
-        'description': '新客戶折 $500',
-        'validUntil': '2025-12-31',
-        'minAmount': 2000,
-        'active': True
-    },
-    'CELEB_ALICE20': {
-        'type': 'percentage',
-        'value': 20,
-        'description': 'Alice 專屬 8折優惠',
-        'validUntil': '2025-06-30',
-        'minAmount': 0,
-        'active': True
-    }
-}
+# ⚠️ 優惠碼完全由 Google Sheets 管理
+# 請在 Google Sheets 中設定優惠碼
+# Sheet ID: 1qituunsVbUJmJCeoPKKOK02LjyNqzN2AYOuZ_D920IU
+# 
+# 不再使用硬編碼的預設優惠碼！
+# 所有優惠碼都從 Google Sheets 載入
+
+PROMO_CODES = {}  # 不使用預設值，完全依賴 Google Sheets
 
 def load_promo_codes_from_sheets():
     """從 Google Sheets 載入優惠碼"""
@@ -134,8 +107,10 @@ def load_promo_codes_from_sheets():
     
     # 檢查是否啟用 Google Sheets
     if not GOOGLE_SHEETS_CONFIG['enabled']:
-        logger.info("📊 Google Sheets 未啟用，使用預設優惠碼")
-        return PROMO_CODES
+        logger.warning("⚠️ Google Sheets 未啟用，無優惠碼可用")
+        logger.warning("⚠️ 請在 Render 設定 GOOGLE_SHEETS_ENABLED=true")
+        # 返回快取（如果有）或空字典
+        return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
     
     # 檢查快取是否有效（1小時內）
     if PROMO_CODES_CACHE['last_updated']:
@@ -149,8 +124,10 @@ def load_promo_codes_from_sheets():
         
         # 載入憑證
         if not GOOGLE_CREDENTIALS_JSON:
-            logger.warning("⚠️ Google Sheets 憑證未設定，使用預設優惠碼")
-            return PROMO_CODES
+            logger.error("❌ Google Sheets 憑證未設定")
+            logger.error("❌ 請在 Render 設定 GOOGLE_CREDENTIALS_JSON")
+            # 返回快取（如果有）或空字典
+            return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
         
         if GOOGLE_SHEETS_ENABLED:
             import json
@@ -177,8 +154,10 @@ def load_promo_codes_from_sheets():
             values = result.get('values', [])
             
             if not values:
-                logger.warning("⚠️ Google Sheets 沒有資料，使用預設優惠碼")
-                return PROMO_CODES
+                logger.warning("⚠️ Google Sheets 沒有資料")
+                logger.warning("⚠️ 請在 Sheet 中添加優惠碼資料")
+                # 返回快取（如果有）或空字典
+                return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
             
             # 解析資料
             promo_codes = {}
@@ -208,8 +187,14 @@ def load_promo_codes_from_sheets():
             
     except Exception as e:
         logger.error(f"❌ 從 Google Sheets 載入優惠碼失敗: {e}")
-        logger.info("📊 使用預設優惠碼")
-        return PROMO_CODES
+        logger.info("📊 嘗試使用快取的優惠碼")
+        # 返回快取（如果有）或空字典
+        if PROMO_CODES_CACHE['data']:
+            logger.info(f"✅ 使用快取的 {len(PROMO_CODES_CACHE['data'])} 個優惠碼")
+            return PROMO_CODES_CACHE['data']
+        else:
+            logger.error("❌ 無快取可用，無優惠碼可用")
+            return {}
 
 def validate_promo_code(promo_code, original_total):
     """
