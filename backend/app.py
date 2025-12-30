@@ -53,7 +53,7 @@ ECPAY_CONFIG = {
     'MerchantID': '3317971',
     'HashKey': 'MN7lld33ls2A7ACQ',
     'HashIV': 'JsQNlwsz3QtbVKIq',
-    'PaymentURL': 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
+    'PaymentURL': 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'  # ✅ 測試站
 }
 
 # Resend Email 配置
