@@ -665,45 +665,118 @@ def generate_customer_email_html(order_data):
         </tr>
         '''
     
+    user_info = order_data['userInfo']
+    
+    # 處理收件人資訊（支援新舊格式）
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
+    # 發票資訊
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_html = ''
+    if invoice_type == 'company':
+        invoice_html = f'''
+        <p><strong>發票類型：</strong>公司發票（三聯式）</p>
+        <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
+        <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
+        '''
+    else:
+        invoice_html = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
+    # 優惠碼資訊
+    promo_html = ''
+    if order_data.get('promoCode'):
+        promo_html = f'''
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 10px 0;">
+            <p style="margin: 0;"><strong>✅ 已使用優惠碼：</strong>{order_data['promoCode']}</p>
+            <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">{order_data.get('promoDescription', '')}</p>
+        </div>
+        '''
+    
     html = f'''
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"><style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 5px; }}
+        .section {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+        .section h3 {{ margin-top: 0; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }}
         table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
         th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
         th {{ background: #f5f5f5; }}
+        .total {{ font-size: 18px; font-weight: bold; color: #4CAF50; margin: 20px 0; }}
     </style></head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>訂單確認</h1>
+                <h1>✨ 訂單確認</h1>
             </div>
-            <p>親愛的 {order_data['userInfo']['name']} 您好，</p>
+            
+            <p>親愛的 {user_info.get('buyerName', user_info.get('name', '顧客'))} 您好，</p>
             <p>感謝您訂購 DUET 客製墜飾！您的訂單已確認。</p>
-            <h3>訂單編號：{order_data['orderId']}</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>項目</th>
-                        <th>字母組合</th>
-                        <th>字體</th>
-                        <th>尺寸</th>
-                        <th>材質</th>
-                        <th>數量</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items_html}
-                </tbody>
-            </table>
-            <h3>訂單總金額：NT$ {order_data['total']:,}</h3>
+            
+            {promo_html}
+            
+            <div class="section">
+                <h3>📦 訂單編號</h3>
+                <p>{order_data['orderId']}</p>
+            </div>
+            
+            <div class="section">
+                <h3>🛍️ 訂購商品</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>項目</th>
+                            <th>字母組合</th>
+                            <th>字體</th>
+                            <th>尺寸</th>
+                            <th>材質</th>
+                            <th>數量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <h3>📋 購買人資訊</h3>
+                <p><strong>姓名：</strong>{user_info.get('buyerName', user_info.get('name', 'N/A'))}</p>
+                <p><strong>Email：</strong>{user_info.get('buyerEmail', user_info.get('email', 'N/A'))}</p>
+                <p><strong>手機：</strong>{user_info.get('buyerPhone', user_info.get('phone', 'N/A'))}</p>
+            </div>
+            
+            <div class="section">
+                <h3>🚚 收件資訊</h3>
+                <p><strong>收件人：</strong>{recipient_name}</p>
+                <p><strong>收件電話：</strong>{recipient_phone}</p>
+                <p><strong>郵遞區號：</strong>{postal_code if postal_code else '(未提供)'}</p>
+                <p><strong>收貨地址：</strong>{shipping_address}</p>
+            </div>
+            
+            <div class="section">
+                <h3>🧾 發票資訊</h3>
+                {invoice_html}
+            </div>
+            
+            {'<div class="section"><h3>💬 備註</h3><p>' + user_info.get('note', '') + '</p></div>' if user_info.get('note') else ''}
+            
+            <div class="section">
+                <h3>💰 訂單金額</h3>
+                {f'<p><strong>原價：</strong>NT$ {order_data.get("originalTotal", order_data["total"]):,}</p>' if order_data.get('discount', 0) > 0 else ''}
+                {f'<p style="color: #4CAF50;"><strong>優惠折扣：</strong>-NT$ {order_data.get("discount", 0):,}</p>' if order_data.get('discount', 0) > 0 else ''}
+                <p class="total">應付金額：NT$ {order_data['total']:,}</p>
+            </div>
+            
             <p>我們將盡快為您製作產品，製作完成後會再次通知您。</p>
             <p>如有任何問題，請隨時與我們聯繫。</p>
             <p>祝您有美好的一天！</p>
-            <p>DUET 團隊 敬上</p>
+            <p><strong>DUET 團隊 敬上</strong></p>
         </div>
     </body>
     </html>
@@ -716,14 +789,69 @@ def generate_internal_order_email_html(order_data):
     for idx, item in enumerate(order_data['items'], 1):
         items_html += f'''
         <tr>
-            <td>{idx}</td>
-            <td>{item['id']}</td>
+            <td style="font-weight: bold;">{idx}</td>
+            <td style="font-size: 11px;">{item['id']}</td>
             <td>{item['letter1']} + {item['letter2']}</td>
-            <td>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</td>
+            <td style="font-size: 11px;">{item.get('font1', 'N/A')}<br>{item.get('font2', 'N/A')}</td>
             <td>{item.get('size', 'N/A')} mm</td>
             <td>{item.get('material', 'N/A')}</td>
             <td>{item.get('quantity', 1)}</td>
+            <td>NT$ {item.get('price', 0):,}</td>
         </tr>
+        <tr style="background: #f9f9f9;">
+            <td colspan="8" style="padding: 10px; font-size: 11px;">
+                <strong>🔧 技術參數：</strong><br>
+                • 墜頭位置 (X/Y/Z): {item.get('bailRelativeX', 0):.2f} / {item.get('bailRelativeY', 0):.2f} / {item.get('bailRelativeZ', 0):.2f}<br>
+                • 墜頭旋轉: {item.get('bailRotation', 0):.2f}°<br>
+                • Letter1 BBox: W={item.get('letter1BBox', {}).get('width', 0):.2f} × H={item.get('letter1BBox', {}).get('height', 0):.2f} × D={item.get('letter1BBox', {}).get('depth', 0):.2f} mm<br>
+                • Letter2 BBox: W={item.get('letter2BBox', {}).get('width', 0):.2f} × H={item.get('letter2BBox', {}).get('height', 0):.2f} × D={item.get('letter2BBox', {}).get('depth', 0):.2f} mm
+            </td>
+        </tr>
+        '''
+    
+    user_info = order_data['userInfo']
+    
+    # 處理收件人資訊（支援新舊格式）
+    buyer_name = user_info.get('buyerName', user_info.get('name', 'N/A'))
+    buyer_email = user_info.get('buyerEmail', user_info.get('email', 'N/A'))
+    buyer_phone = user_info.get('buyerPhone', user_info.get('phone', 'N/A'))
+    
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
+    # 發票資訊
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_info = ''
+    if invoice_type == 'company':
+        invoice_info = f'''
+        <p><strong>發票類型：</strong>公司發票（三聯式）</p>
+        <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
+        <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
+        '''
+    else:
+        invoice_info = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
+    # 優惠碼資訊
+    promo_info = ''
+    if order_data.get('promoCode'):
+        promo_info = f'''
+        <div style="background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0;">
+            <p style="margin: 0;"><strong>✅ 使用優惠碼：</strong>{order_data['promoCode']}</p>
+            <p style="margin: 5px 0 0 0; font-size: 12px;">{order_data.get('promoDescription', '')}</p>
+        </div>
+        '''
+    
+    # 備註
+    note_info = ''
+    if user_info.get('note'):
+        note_info = f'''
+        <div style="background: #e3f2fd; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0;">
+            <p style="margin: 0;"><strong>💬 客戶備註：</strong></p>
+            <p style="margin: 5px 0 0 0;">{user_info.get('note')}</p>
+        </div>
         '''
     
     html = f'''
@@ -731,44 +859,87 @@ def generate_internal_order_email_html(order_data):
     <html>
     <head><meta charset="UTF-8"><style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
+        .container {{ max-width: 1000px; margin: 0 auto; padding: 20px; }}
         .header {{ background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
         table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 12px; }}
-        th {{ background: #f5f5f5; }}
-        .info {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+        th, td {{ padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 12px; }}
+        th {{ background: #f5f5f5; font-weight: bold; }}
+        .info-section {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+        .info-section h3 {{ margin-top: 0; color: #2196F3; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}
+        .amount {{ font-size: 18px; font-weight: bold; color: #4CAF50; }}
+        .urgent {{ background: #ffebee; border-left: 4px solid #f44336; padding: 10px; margin: 10px 0; }}
     </style></head>
     <body>
         <div class="container">
             <div class="header">
                 <h1>🆕 新訂單通知</h1>
+                <p style="margin: 5px 0 0 0; font-size: 14px;">請確認訂單資訊並準備生產</p>
             </div>
-            <div class="info">
-                <h3>訂單編號：{order_data['orderId']}</h3>
-                <p><strong>顧客姓名：</strong>{order_data['userInfo']['name']}</p>
-                <p><strong>Email：</strong>{order_data['userInfo']['email']}</p>
-                <p><strong>電話：</strong>{order_data['userInfo']['phone']}</p>
-                <p><strong>訂單總金額：</strong>NT$ {order_data['total']:,}</p>
+            
+            <div class="info-section">
+                <h3>📋 訂單資訊</h3>
+                <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
                 <p><strong>訂單時間：</strong>{order_data.get('timestamp', 'N/A')}</p>
+                <p><strong>訂單狀態：</strong>✅ 已付款</p>
             </div>
-            <h3>訂單明細：</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>項目</th>
-                        <th>ID</th>
-                        <th>字母組合</th>
-                        <th>字體</th>
-                        <th>尺寸</th>
-                        <th>材質</th>
-                        <th>數量</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items_html}
-                </tbody>
-            </table>
-            <p><strong>注意：</strong>STL 檔案生成完成後會另外發送。</p>
+            
+            {promo_info}
+            
+            <div class="info-section">
+                <h3>💰 金額明細</h3>
+                {f'<p><strong>原價：</strong>NT$ {order_data.get("originalTotal", order_data["total"]):,}</p>' if order_data.get('discount', 0) > 0 else ''}
+                {f'<p style="color: #4CAF50;"><strong>優惠折扣：</strong>-NT$ {order_data.get("discount", 0):,}</p>' if order_data.get('discount', 0) > 0 else ''}
+                <p class="amount">應付金額：NT$ {order_data['total']:,}</p>
+            </div>
+            
+            <div class="urgent">
+                <p style="margin: 0;"><strong>⚠️ 出貨資訊（重要）</strong></p>
+            </div>
+            
+            <div class="info-section">
+                <h3>👤 購買人資訊</h3>
+                <p><strong>姓名：</strong>{buyer_name}</p>
+                <p><strong>Email：</strong>{buyer_email}</p>
+                <p><strong>電話：</strong>{buyer_phone}</p>
+            </div>
+            
+            <div class="info-section">
+                <h3>📦 收件資訊</h3>
+                <p><strong>收件人：</strong>{recipient_name}</p>
+                <p><strong>收件電話：</strong>{recipient_phone}</p>
+                <p><strong>郵遞區號：</strong>{postal_code if postal_code else '(未提供)'}</p>
+                <p><strong>收貨地址：</strong>{shipping_address}</p>
+            </div>
+            
+            <div class="info-section">
+                <h3>🧾 發票資訊</h3>
+                {invoice_info}
+            </div>
+            
+            {note_info}
+            
+            <div class="info-section">
+                <h3>🛍️ 訂單明細（生產參數）</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>項</th>
+                            <th>商品 ID</th>
+                            <th>字母</th>
+                            <th>字體</th>
+                            <th>尺寸</th>
+                            <th>材質</th>
+                            <th>數量</th>
+                            <th>單價</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+            </div>
+            
+            <p style="background: #fff9c4; padding: 10px; border-radius: 5px;"><strong>📌 下一步：</strong>STL 檔案生成完成後會另外發送。</p>
         </div>
     </body>
     </html>
@@ -781,11 +952,54 @@ def generate_internal_stl_email_html(order_data):
     for idx, item in enumerate(order_data['items'], 1):
         items_html += f'''
         <tr>
-            <td>{idx}</td>
-            <td>{item['id']}.stl</td>
+            <td style="font-weight: bold;">{idx}</td>
+            <td style="font-size: 11px;">{item['id']}.stl</td>
             <td>{item['letter1']} + {item['letter2']}</td>
-            <td>{item.get('font1', 'N/A')} + {item.get('font2', 'N/A')}</td>
+            <td style="font-size: 11px;">{item.get('font1', 'N/A')}<br>{item.get('font2', 'N/A')}</td>
+            <td>{item.get('size', 'N/A')} mm</td>
+            <td>{item.get('material', 'N/A')}</td>
+            <td>{item.get('quantity', 1)}</td>
         </tr>
+        <tr style="background: #f0f8ff;">
+            <td colspan="7" style="padding: 10px; font-size: 11px;">
+                <strong>🔧 生產參數：</strong><br>
+                • 墜頭位置 (X/Y/Z): {item.get('bailRelativeX', 0):.2f} / {item.get('bailRelativeY', 0):.2f} / {item.get('bailRelativeZ', 0):.2f}<br>
+                • 墜頭旋轉: {item.get('bailRotation', 0):.2f}°<br>
+                • Letter1 BBox: W={item.get('letter1BBox', {}).get('width', 0):.2f} × H={item.get('letter1BBox', {}).get('height', 0):.2f} × D={item.get('letter1BBox', {}).get('depth', 0):.2f} mm<br>
+                • Letter2 BBox: W={item.get('letter2BBox', {}).get('width', 0):.2f} × H={item.get('letter2BBox', {}).get('height', 0):.2f} × D={item.get('letter2BBox', {}).get('depth', 0):.2f} mm
+            </td>
+        </tr>
+        '''
+    
+    user_info = order_data['userInfo']
+    
+    # 處理收件人資訊（支援新舊格式）
+    buyer_name = user_info.get('buyerName', user_info.get('name', 'N/A'))
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
+    # 發票資訊
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_info = ''
+    if invoice_type == 'company':
+        invoice_info = f'''
+        <p><strong>發票類型：</strong>公司發票（三聯式）</p>
+        <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
+        <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
+        '''
+    else:
+        invoice_info = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
+    # 備註
+    note_info = ''
+    if user_info.get('note'):
+        note_info = f'''
+        <div style="background: #e3f2fd; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0;">
+            <p style="margin: 0;"><strong>💬 客戶備註：</strong></p>
+            <p style="margin: 5px 0 0 0;">{user_info.get('note')}</p>
+        </div>
         '''
     
     html = f'''
@@ -793,38 +1007,72 @@ def generate_internal_stl_email_html(order_data):
     <html>
     <head><meta charset="UTF-8"><style>
         body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 800px; margin: 0 auto; padding: 20px; }}
+        .container {{ max-width: 1000px; margin: 0 auto; padding: 20px; }}
         .header {{ background: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px; }}
         table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        th, td {{ padding: 10px; border: 1px solid #ddd; text-align: left; }}
-        th {{ background: #f5f5f5; }}
-        .info {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+        th, td {{ padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 12px; }}
+        th {{ background: #f5f5f5; font-weight: bold; }}
+        .info-section {{ background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0; }}
+        .info-section h3 {{ margin-top: 0; color: #4CAF50; border-bottom: 2px solid #ddd; padding-bottom: 5px; }}
+        .urgent {{ background: #ffebee; border-left: 4px solid #f44336; padding: 10px; margin: 10px 0; font-weight: bold; }}
     </style></head>
     <body>
         <div class="container">
             <div class="header">
                 <h1>✅ STL 檔案已完成</h1>
+                <p style="margin: 5px 0 0 0; font-size: 14px;">請下載後進行生產並準備出貨</p>
             </div>
-            <div class="info">
-                <h3>訂單編號：{order_data['orderId']}</h3>
-                <p><strong>顧客姓名：</strong>{order_data['userInfo']['name']}</p>
-                <p><strong>訂單總金額：</strong>NT$ {order_data['total']:,}</p>
+            
+            <div class="info-section">
+                <h3>📋 訂單資訊</h3>
+                <p><strong>訂單編號：</strong>{order_data['orderId']}</p>
+                <p><strong>訂單金額：</strong>NT$ {order_data['total']:,}</p>
+                <p><strong>購買人：</strong>{buyer_name}</p>
             </div>
-            <h3>STL 檔案列表：</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>項目</th>
-                        <th>檔案名稱</th>
-                        <th>字母組合</th>
-                        <th>字體</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items_html}
-                </tbody>
-            </table>
-            <p><strong>所有 STL 檔案已附加在此郵件中，請下載後進行生產。</strong></p>
+            
+            <div class="urgent">
+                <p style="margin: 0;">⚠️ 請確認出貨地址和發票資訊</p>
+            </div>
+            
+            <div class="info-section">
+                <h3>📦 出貨資訊</h3>
+                <p><strong>收件人：</strong>{recipient_name}</p>
+                <p><strong>收件電話：</strong>{recipient_phone}</p>
+                <p><strong>郵遞區號：</strong>{postal_code if postal_code else '(未提供)'}</p>
+                <p><strong>收貨地址：</strong>{shipping_address}</p>
+            </div>
+            
+            <div class="info-section">
+                <h3>🧾 發票資訊</h3>
+                {invoice_info}
+            </div>
+            
+            {note_info}
+            
+            <div class="info-section">
+                <h3>📄 STL 檔案列表（含生產參數）</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>項</th>
+                            <th>檔案名稱</th>
+                            <th>字母</th>
+                            <th>字體</th>
+                            <th>尺寸</th>
+                            <th>材質</th>
+                            <th>數量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>✅ 所有 STL 檔案已附加在此郵件中</strong></p>
+                <p style="margin: 5px 0 0 0; font-size: 13px;">請下載後進行生產，完成後依照上述地址出貨</p>
+            </div>
         </div>
     </body>
     </html>
