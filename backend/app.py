@@ -1138,30 +1138,34 @@ def generate_stl():
 # ==========================================
 
 def prepare_custom_fields(order_data):
-    """準備 CustomField（訂單備份到綠界）"""
+    """準備 CustomField（訂單備份到綠界）- 使用簡單字符串"""
     try:
         items = order_data.get('items', [])
-        field1 = json.dumps({
-            'id': order_data.get('orderId', ''),
-            'name': order_data.get('userInfo', {}).get('name', ''),
-            'email': order_data.get('userInfo', {}).get('email', ''),
-            'phone': order_data.get('userInfo', {}).get('phone', ''),
-            'total': order_data.get('total', 0)
-        }, ensure_ascii=False)[:200]
+        user_info = order_data.get('userInfo', {})
         
+        # CustomField1: 基本訂單信息（用 _ 分隔）
+        field1 = '_'.join([
+            str(order_data.get('orderId', '')),
+            str(user_info.get('name', '')),
+            str(user_info.get('email', '')),
+            str(user_info.get('phone', '')),
+            str(order_data.get('total', 0))
+        ])[:200]
+        
+        # CustomField2-4: 商品信息（用 _ 分隔）
         def compress_item(item):
-            return json.dumps({
-                "L1": item.get('letter1', ''),
-                "L2": item.get('letter2', ''),
-                "F1": item.get('font1', ''),
-                "F2": item.get('font2', ''),
-                "S": item.get('size', 15),
-                "M": item.get('material', '金'),
-                "RX": item.get('bailRelativeX', 0),    # 改用 bailRelative
-                "RY": item.get('bailRelativeY', 0),
-                "RZ": item.get('bailRelativeZ', 0),
-                "ROT": item.get('bailRotation', 0)      # 加入 bailRotation
-            }, ensure_ascii=False)[:200]
+            return '_'.join([
+                str(item.get('letter1', '')),
+                str(item.get('letter2', '')),
+                str(item.get('font1', '')),
+                str(item.get('font2', '')),
+                str(item.get('size', 15)),
+                str(item.get('material', 'gold18k')),
+                str(item.get('bailRelativeX', 0)),
+                str(item.get('bailRelativeY', 0)),
+                str(item.get('bailRelativeZ', 0)),
+                str(item.get('bailRotation', 0))
+            ])[:200]
         
         field2 = compress_item(items[0]) if len(items) > 0 else ''
         field3 = compress_item(items[1]) if len(items) > 1 else ''
