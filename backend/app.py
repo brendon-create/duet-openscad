@@ -1291,13 +1291,13 @@ def checkout():
             'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
             'PaymentType': 'aio',
             'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
-            'TradeDesc': 'DUET客製墜飾',
-            'ItemName': f"客製墜飾 x {len(items)}",
+            'TradeDesc': 'DUET',
+            'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
             # 'ClientBackURL': return_url, #
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
-            **custom_fields  # 加入 CustomField
+            # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
         }
         
         check_mac_value = generate_check_mac_value(payment_params, 
