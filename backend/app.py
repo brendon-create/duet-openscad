@@ -1209,7 +1209,8 @@ def validate_promo():
 
 def generate_check_mac_value(params, hash_key, hash_iv):
     """產生綠界 CheckMacValue"""
-    sorted_params = sorted(params.items())
+    filtered_params = {k: v for k, v in params.items() if v}
+    sorted_params = sorted(filtered_params.items())  # ← 這裡
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     encoded_str = urllib.parse.quote_plus(raw_str).lower()
