@@ -1213,7 +1213,9 @@ def generate_check_mac_value(params, hash_key, hash_iv):
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     encoded_str = urllib.parse.quote_plus(raw_str).lower()
+    logger.info(f"🔐 待簽名字串: {raw_str}")
     check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
+    logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
 
 @app.route('/api/checkout', methods=['POST'])
