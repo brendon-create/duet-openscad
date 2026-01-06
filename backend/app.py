@@ -1279,13 +1279,12 @@ def checkout():
             'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
             'PaymentType': 'aio',
             'TotalAmount': str(int(final_total)),
-            'TradeDesc': 'DUET',              # ← 改这里
-            'ItemName': 'Pendant',            # ← 改这里
+            'TradeDesc': 'DUET',
+            'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            # 'ClientBackURL': return_url, #
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
-            **custom_fields
+            # **custom_fields  # ← 暂时注释掉
         }
         
         check_mac_value = generate_check_mac_value(payment_params, 
