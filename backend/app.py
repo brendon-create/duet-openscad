@@ -1147,7 +1147,6 @@ def prepare_custom_fields(order_data):
         field1 = '_'.join([
             str(order_data.get('orderId', '')),
             str(user_info.get('name', '')),
-            str(user_info.get('email', '')),
             str(user_info.get('phone', '')),
             str(order_data.get('total', 0))
         ])[:200]
