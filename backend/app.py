@@ -1147,6 +1147,7 @@ def prepare_custom_fields(order_data):
         field1 = '_'.join([
             str(order_data.get('orderId', '')),
             str(user_info.get('name', '')),
+            str(user_info.get('email', '')),
             str(user_info.get('phone', '')),
             str(order_data.get('total', 0))
         ])[:200]
@@ -1216,13 +1217,24 @@ def validate_promo():
 
 def generate_check_mac_value(params, hash_key, hash_iv):
     """產生綠界 CheckMacValue"""
+    # 过滤空值
     filtered_params = {k: v for k, v in params.items() if v}
-    sorted_params = sorted(filtered_params.items())  # ← 這裡
-    param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
+    sorted_params = sorted(filtered_params.items())
+    
+    # 对每个参数值单独 URL encode
+    encoded_params = []
+    for k, v in sorted_params:
+        encoded_value = urllib.parse.quote_plus(str(v))
+        encoded_params.append(f"{k}={encoded_value}")
+    
+    param_str = '&'.join(encoded_params)
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
-    encoded_str = urllib.parse.quote_plus(raw_str).lower()
+    
+    # 转小写（不再对整个字符串 encode）
+    final_str = raw_str.lower()
+    
     logger.info(f"🔐 待簽名字串: {raw_str}")
-    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
+    check_mac = hashlib.sha256(final_str.encode('utf-8')).hexdigest().upper()
     logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
 
@@ -1278,13 +1290,14 @@ def checkout():
             'MerchantTradeNo': order_id,
             'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
             'PaymentType': 'aio',
-            'TotalAmount': str(int(final_total)),
-            'TradeDesc': 'DUET',
-            'ItemName': 'Pendant',
+            'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
+            'TradeDesc': 'DUET客製墜飾',
+            'ItemName': f"客製墜飾 x {len(items)}",
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
+            # 'ClientBackURL': return_url, #
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
-            # **custom_fields  # ← 暂时注释掉
+            **custom_fields  # 加入 CustomField
         }
         
         check_mac_value = generate_check_mac_value(payment_params, 
