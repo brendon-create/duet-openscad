@@ -1268,7 +1268,7 @@ def checkout():
             'MerchantTradeNo': order_id,
             'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
             'PaymentType': 'aio',
-            'TotalAmount': str(final_total),  # ✅ 使用折扣後的金額
+            'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
             'TradeDesc': 'DUET客製墜飾',
             'ItemName': f"客製墜飾 x {len(items)}",
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
