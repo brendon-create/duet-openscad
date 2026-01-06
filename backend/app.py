@@ -69,7 +69,7 @@ resend.api_key = RESEND_API_KEY
 GOOGLE_SHEETS_CONFIG = {
     'enabled': os.environ.get('GOOGLE_SHEETS_ENABLED', 'false').lower() == 'true',
     'sheet_id': os.environ.get('PROMO_SHEET_ID', ''),
-    'range_name': 'Sheet1!A2:I',  # 從第2列開始（第1列是標題）
+    'range_name': 'A2:I',  # 不指定 Sheet 名稱，使用第一個 sheet
     'cache_duration': 3600,  # 快取 1 小時
 }
 GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
@@ -225,8 +225,17 @@ def validate_promo_code(promo_code, original_total):
     valid_until = promo.get('validUntil')
     if valid_until:
         try:
-            expiry_date = datetime.strptime(valid_until, '%Y-%m-%d')
-            if datetime.now() > expiry_date:
+            # 支持多種日期格式
+            date_formats = ['%Y-%m-%d', '%Y/%m/%d', '%Y/%m/%d', '%Y-%m-%d']
+            expiry_date = None
+            for fmt in date_formats:
+                try:
+                    expiry_date = datetime.strptime(valid_until, fmt)
+                    break
+                except:
+                    continue
+            
+            if expiry_date and datetime.now() > expiry_date:
                 return False, 0, None, '此優惠碼已過期'
         except:
             pass
