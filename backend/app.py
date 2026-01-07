@@ -343,10 +343,10 @@ def save_to_google_sheets(order_data):
             order_data.get('status', 'pending')                         # L: 狀態
         ]
         
-        # 寫入 Google Sheets
+        # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range='Sheet1!A:L',  # 改成 A:L（12 欄）
+            range='A:L',  # 不指定分頁名稱
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
