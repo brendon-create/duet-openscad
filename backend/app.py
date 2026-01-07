@@ -65,6 +65,10 @@ INTERNAL_EMAIL = 'brendon@brendonchen.com'
 # 設定 Resend API Key
 resend.api_key = RESEND_API_KEY
 
+# Google Sheets 配置（訂單記錄）
+SHEETS_ID = os.environ.get('SHEETS_ID', '')  # 訂單記錄用的 Sheet ID
+GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
+
 # Google Sheets 配置（優惠碼管理）
 GOOGLE_SHEETS_CONFIG = {
     'enabled': os.environ.get('GOOGLE_SHEETS_ENABLED', 'false').lower() == 'true',
@@ -72,7 +76,6 @@ GOOGLE_SHEETS_CONFIG = {
     'range_name': 'A2:I',  # 不指定 Sheet 名稱，使用第一個 sheet
     'cache_duration': 3600,  # 快取 1 小時
 }
-GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
 
 # 優惠碼快取
 PROMO_CODES_CACHE = {
@@ -297,7 +300,7 @@ def update_order_status(order_id, status, payment_data=None):
 
 def save_to_google_sheets(order_data):
     """儲存訂單到 Google Sheets"""
-    if not GOOGLE_SHEETS_ENABLED or not GOOGLE_SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
+    if not GOOGLE_SHEETS_ENABLED or not SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
         logger.warning("⚠️ Google Sheets 未啟用，跳過")
         return
     
@@ -320,23 +323,30 @@ def save_to_google_sheets(order_data):
         item2 = json.dumps(items[1], ensure_ascii=False) if len(items) > 1 else ''
         item3 = json.dumps(items[2], ensure_ascii=False) if len(items) > 2 else ''
         
+        # 原始金額和結帳金額
+        original_total = order_data.get('originalTotal', order_data.get('total', 0))
+        final_total = order_data.get('total', 0)
+        promo_code = order_data.get('promoCode', '')
+        
         row = [
-            order_data.get('orderId', ''),
-            order_data.get('userInfo', {}).get('name', ''),
-            order_data.get('userInfo', {}).get('email', ''),
-            order_data.get('userInfo', {}).get('phone', ''),
-            item1,
-            item2,
-            item3,
-            order_data.get('total', 0),
-            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            order_data.get('status', 'pending')
+            order_data.get('orderId', ''),                              # A: 訂單編號
+            order_data.get('userInfo', {}).get('name', ''),            # B: 客戶姓名
+            order_data.get('userInfo', {}).get('email', ''),           # C: Email
+            order_data.get('userInfo', {}).get('phone', ''),           # D: 電話
+            item1,                                                      # E: 商品1
+            item2,                                                      # F: 商品2
+            item3,                                                      # G: 商品3
+            original_total,                                             # H: 總金額（原價）
+            promo_code,                                                 # I: 優惠碼
+            final_total,                                                # J: 結帳金額
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
+            order_data.get('status', 'pending')                         # L: 狀態
         ]
         
         # 寫入 Google Sheets
         service.spreadsheets().values().append(
-            spreadsheetId=GOOGLE_SHEETS_ID,
-            range='訂單!A:J',
+            spreadsheetId=SHEETS_ID,
+            range='Sheet1!A:L',  # 改成 A:L（12 欄）
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
@@ -1423,8 +1433,8 @@ def process_order_after_payment(order_id, payment_data):
                 # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
                 # send_internal_order_email(order)  # ← 不再需要
                 
-                # 儲存到 Google Sheets（暫時停用，待配置 SHEETS_ID）
-                # save_to_google_sheets(order)
+                # 儲存到 Google Sheets
+                save_to_google_sheets(order)
                 
                 # 加入 STL 生成隊列
                 add_to_stl_queue(order_id)
