@@ -1221,20 +1221,15 @@ def generate_check_mac_value(params, hash_key, hash_iv):
     filtered_params = {k: v for k, v in params.items() if v}
     sorted_params = sorted(filtered_params.items())
     
-    # 对每个参数值单独 URL encode
-    encoded_params = []
-    for k, v in sorted_params:
-        encoded_value = urllib.parse.quote_plus(str(v))
-        encoded_params.append(f"{k}={encoded_value}")
-    
-    param_str = '&'.join(encoded_params)
+    # 组装参数字符串（不对参数值 encode）
+    param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     
-    # 转小写（不再对整个字符串 encode）
-    final_str = raw_str.lower()
+    # 整体 URL encode 并转小写
+    encoded_str = urllib.parse.quote_plus(raw_str).lower()
     
     logger.info(f"🔐 待簽名字串: {raw_str}")
-    check_mac = hashlib.sha256(final_str.encode('utf-8')).hexdigest().upper()
+    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
     logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
 
