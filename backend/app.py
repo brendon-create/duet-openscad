@@ -1215,44 +1215,54 @@ def validate_promo():
         logger.error(f"❌ 優惠碼驗證錯誤: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def generate_check_mac_value(params, hash_key, hash_iv):
-    """產生綠界 CheckMacValue - 按照綠界官方規範"""
-    # 过滤空值
+def generate_check_mac_value(params, hash_key, hash_iv, is_callback=False):
+    """產生綠界 CheckMacValue
+    
+    Args:
+        params: 參數字典
+        hash_key: HashKey
+        hash_iv: HashIV
+        is_callback: 是否為回調驗證（True=回調，False=發送）
+    """
+    # 過濾空值
     filtered_params = {k: v for k, v in params.items() if v}
     sorted_params = sorted(filtered_params.items())
     
-    # 1. 参数按字母排序并用 & 连接
+    # 1. 參數按字母排序並用 & 連接
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
     
-    # 2. 前面加 HashKey，后面加 HashIV
+    # 2. 前面加 HashKey，後面加 HashIV
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     
-    # 3. URL encode
-    encoded_str = urllib.parse.quote_plus(raw_str)
-    
-    # 4. 特殊字符替换（按照绿界规范）
-    encoded_str = encoded_str.replace('%2D', '-')
-    encoded_str = encoded_str.replace('%2d', '-')
-    encoded_str = encoded_str.replace('%5F', '_')
-    encoded_str = encoded_str.replace('%5f', '_')
-    encoded_str = encoded_str.replace('%2E', '.')
-    encoded_str = encoded_str.replace('%2e', '.')
-    encoded_str = encoded_str.replace('%21', '!')
-    encoded_str = encoded_str.replace('%2A', '*')
-    encoded_str = encoded_str.replace('%2a', '*')
-    encoded_str = encoded_str.replace('%28', '(')
-    encoded_str = encoded_str.replace('%29', ')')
-    
-    # 5. 转小写
-    encoded_str = encoded_str.lower()
-    
-    logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
-    logger.info(f"🔐 待簽名字串（編碼）: {encoded_str}")
+    if is_callback:
+        # 回調驗證：不做 URL encode，直接轉小寫
+        final_str = raw_str.lower()
+        logger.info(f"🔐 待簽名字串（回調，未編碼）: {final_str}")
+    else:
+        # 發送時：需要 URL encode + 特殊字符替換
+        # 3. URL encode
+        encoded_str = urllib.parse.quote_plus(raw_str)
+        
+        # 4. 轉小寫
+        encoded_str = encoded_str.lower()
+        
+        # 5. 特殊字符替換
+        encoded_str = encoded_str.replace('%2d', '-')
+        encoded_str = encoded_str.replace('%5f', '_')
+        encoded_str = encoded_str.replace('%2e', '.')
+        encoded_str = encoded_str.replace('%21', '!')
+        encoded_str = encoded_str.replace('%2a', '*')
+        encoded_str = encoded_str.replace('%28', '(')
+        encoded_str = encoded_str.replace('%29', ')')
+        
+        final_str = encoded_str
+        logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
+        logger.info(f"🔐 待簽名字串（編碼）: {final_str}")
     
     # 6. SHA256 加密
-    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest()
+    check_mac = hashlib.sha256(final_str.encode('utf-8')).hexdigest()
     
-    # 7. 转大写
+    # 7. 轉大寫
     check_mac = check_mac.upper()
     
     logger.info(f"🔐 CheckMacValue: {check_mac}")
@@ -1349,6 +1359,11 @@ def payment_callback():
         data = request.form.to_dict()
         logger.info(f"📥 收到綠界回調: {data.get('MerchantTradeNo')}")
         
+        # DEBUG: 顯示所有原始參數
+        logger.info(f"🔍 DEBUG - 所有參數:")
+        for k, v in sorted(data.items()):
+            logger.info(f"   {k}={v}")
+        
         # ✅ 詳細記錄 CustomField 內容（用於測試）
         logger.info(f"📦 CustomField1: {data.get('CustomField1', '(empty)')}")
         logger.info(f"📦 CustomField2: {data.get('CustomField2', '(empty)')}")
@@ -1358,7 +1373,8 @@ def payment_callback():
         received_check_mac = data.pop('CheckMacValue', '')
         calculated_check_mac = generate_check_mac_value(data, 
                                                        ECPAY_CONFIG['HashKey'], 
-                                                       ECPAY_CONFIG['HashIV'])
+                                                       ECPAY_CONFIG['HashIV'],
+                                                       is_callback=True)  # 回調驗證
         
         logger.info(f"📨 綠界發來的 CheckMacValue: {received_check_mac}")
         logger.info(f"🔢 我們計算的 CheckMacValue: {calculated_check_mac}")
