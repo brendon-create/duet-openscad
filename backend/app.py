@@ -1221,14 +1221,16 @@ def generate_check_mac_value(params, hash_key, hash_iv):
     filtered_params = {k: v for k, v in params.items() if v}
     sorted_params = sorted(filtered_params.items())
     
-    # 组装参数字符串（不对参数值 encode）
+    # 组装参数字符串
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     
-    # 整体 URL encode 并转小写
-    encoded_str = urllib.parse.quote_plus(raw_str).lower()
+    # URL encode（使用 quote，空格变 %20）
+    encoded_str = urllib.parse.quote(raw_str, safe='').lower()
     
-    logger.info(f"🔐 待簽名字串: {raw_str}")
+    logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
+    logger.info(f"🔐 待簽名字串（編碼）: {encoded_str}")
+    
     check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
     logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
@@ -1335,8 +1337,13 @@ def payment_callback():
                                                        ECPAY_CONFIG['HashKey'], 
                                                        ECPAY_CONFIG['HashIV'])
         
+        logger.info(f"📨 綠界發來的 CheckMacValue: {received_check_mac}")
+        logger.info(f"🔢 我們計算的 CheckMacValue: {calculated_check_mac}")
+        
         if received_check_mac != calculated_check_mac:
             logger.error(f"❌ CheckMacValue 驗證失敗！")
+            logger.error(f"   收到: {received_check_mac}")
+            logger.error(f"   計算: {calculated_check_mac}")
             return '0|CheckMacValue Error'
         
         logger.info("✅ CheckMacValue 驗證通過")
