@@ -1423,8 +1423,8 @@ def process_order_after_payment(order_id, payment_data):
                 # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
                 # send_internal_order_email(order)  # ← 不再需要
                 
-                # 儲存到 Google Sheets
-                save_to_google_sheets(order)
+                # 儲存到 Google Sheets（暫時停用，待配置 SHEETS_ID）
+                # save_to_google_sheets(order)
                 
                 # 加入 STL 生成隊列
                 add_to_stl_queue(order_id)
