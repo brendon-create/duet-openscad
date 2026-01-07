@@ -1216,22 +1216,45 @@ def validate_promo():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def generate_check_mac_value(params, hash_key, hash_iv):
-    """產生綠界 CheckMacValue"""
+    """產生綠界 CheckMacValue - 按照綠界官方規範"""
     # 过滤空值
     filtered_params = {k: v for k, v in params.items() if v}
     sorted_params = sorted(filtered_params.items())
     
-    # 组装参数字符串
+    # 1. 参数按字母排序并用 & 连接
     param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
+    
+    # 2. 前面加 HashKey，后面加 HashIV
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     
-    # URL encode 并转小写
-    encoded_str = urllib.parse.quote_plus(raw_str).lower()
+    # 3. URL encode
+    encoded_str = urllib.parse.quote_plus(raw_str)
+    
+    # 4. 特殊字符替换（按照绿界规范）
+    encoded_str = encoded_str.replace('%2D', '-')
+    encoded_str = encoded_str.replace('%2d', '-')
+    encoded_str = encoded_str.replace('%5F', '_')
+    encoded_str = encoded_str.replace('%5f', '_')
+    encoded_str = encoded_str.replace('%2E', '.')
+    encoded_str = encoded_str.replace('%2e', '.')
+    encoded_str = encoded_str.replace('%21', '!')
+    encoded_str = encoded_str.replace('%2A', '*')
+    encoded_str = encoded_str.replace('%2a', '*')
+    encoded_str = encoded_str.replace('%28', '(')
+    encoded_str = encoded_str.replace('%29', ')')
+    
+    # 5. 转小写
+    encoded_str = encoded_str.lower()
     
     logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
     logger.info(f"🔐 待簽名字串（編碼）: {encoded_str}")
     
-    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest().upper()
+    # 6. SHA256 加密
+    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest()
+    
+    # 7. 转大写
+    check_mac = check_mac.upper()
+    
     logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
 
