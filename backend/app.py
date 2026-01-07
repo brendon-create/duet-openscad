@@ -1224,8 +1224,13 @@ def generate_check_mac_value(params, hash_key, hash_iv, is_callback=False):
         hash_iv: HashIV
         is_callback: 是否為回調驗證（True=回調，False=發送）
     """
-    # 過濾空值
-    filtered_params = {k: v for k, v in params.items() if v}
+    if is_callback:
+        # 回調驗證：不過濾空值！綠界會發送空的 CustomField、StoreID
+        filtered_params = params
+    else:
+        # 發送時：過濾空值
+        filtered_params = {k: v for k, v in params.items() if v}
+    
     sorted_params = sorted(filtered_params.items())
     
     # 1. 參數按字母排序並用 & 連接
@@ -1234,33 +1239,29 @@ def generate_check_mac_value(params, hash_key, hash_iv, is_callback=False):
     # 2. 前面加 HashKey，後面加 HashIV
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
     
+    # 3. URL encode
+    encoded_str = urllib.parse.quote_plus(raw_str)
+    
+    # 4. 轉小寫
+    encoded_str = encoded_str.lower()
+    
+    # 5. 特殊字符替換
+    encoded_str = encoded_str.replace('%2d', '-')
+    encoded_str = encoded_str.replace('%5f', '_')
+    encoded_str = encoded_str.replace('%2e', '.')
+    encoded_str = encoded_str.replace('%21', '!')
+    encoded_str = encoded_str.replace('%2a', '*')
+    encoded_str = encoded_str.replace('%28', '(')
+    encoded_str = encoded_str.replace('%29', ')')
+    
     if is_callback:
-        # 回調驗證：不做 URL encode，直接轉小寫
-        final_str = raw_str.lower()
-        logger.info(f"🔐 待簽名字串（回調，未編碼）: {final_str}")
+        logger.info(f"🔐 待簽名字串（回調）: {raw_str}")
     else:
-        # 發送時：需要 URL encode + 特殊字符替換
-        # 3. URL encode
-        encoded_str = urllib.parse.quote_plus(raw_str)
-        
-        # 4. 轉小寫
-        encoded_str = encoded_str.lower()
-        
-        # 5. 特殊字符替換
-        encoded_str = encoded_str.replace('%2d', '-')
-        encoded_str = encoded_str.replace('%5f', '_')
-        encoded_str = encoded_str.replace('%2e', '.')
-        encoded_str = encoded_str.replace('%21', '!')
-        encoded_str = encoded_str.replace('%2a', '*')
-        encoded_str = encoded_str.replace('%28', '(')
-        encoded_str = encoded_str.replace('%29', ')')
-        
-        final_str = encoded_str
         logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
-        logger.info(f"🔐 待簽名字串（編碼）: {final_str}")
+    logger.info(f"🔐 待簽名字串（編碼）: {encoded_str}")
     
     # 6. SHA256 加密
-    check_mac = hashlib.sha256(final_str.encode('utf-8')).hexdigest()
+    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest()
     
     # 7. 轉大寫
     check_mac = check_mac.upper()
