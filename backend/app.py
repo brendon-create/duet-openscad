@@ -24,7 +24,8 @@ import hashlib
 import urllib.parse
 from datetime import datetime
 import json
-import resend
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
@@ -331,14 +332,16 @@ ECPAY_CONFIG = {
     'PaymentURL': 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'  # ✅ 測試站
 }
 
-# Resend Email 配置
-RESEND_API_KEY = 're_Vy8zWUJ2_KhUfFBXD5qiPEVPPsLAghgGr'
-SENDER_EMAIL = 'onboarding@resend.dev'  # 測試用，之後改成 service@brendonchen.com
+# Brevo Email 配置
+BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+SENDER_EMAIL = 'service@brendonchen.com'
 SENDER_NAME = 'DUET 客製珠寶'
 INTERNAL_EMAIL = 'brendon@brendonchen.com'
 
-# 設定 Resend API Key
-resend.api_key = RESEND_API_KEY
+# 設定 Brevo API
+configuration = sib_api_v3_sdk.Configuration()
+configuration.api_key['api-key'] = BREVO_API_KEY
+brevo_api = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
 # Google Sheets 配置（訂單記錄）
 SHEETS_ID = os.environ.get('SHEETS_ID', '')  # 訂單記錄用的 Sheet ID
@@ -852,15 +855,15 @@ def send_customer_confirmation_email(order_data):
         
         html = generate_customer_email_html(order_data)
         
-        params = {
-            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
-            "to": [customer_email],
-            "subject": f"訂單確認 - {order_data['orderId']}",
-            "html": html
-        }
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
+            to=[{"email": customer_email}],
+            subject=f"訂單確認 - {order_data['orderId']}",
+            html_content=html
+        )
         
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 顧客確認 Email 已發送: {email}")
+        result = brevo_api.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 顧客確認 Email 已發送: {result}")
         return True
         
     except Exception as e:
@@ -874,15 +877,15 @@ def send_internal_order_email(order_data):
         
         html = generate_internal_order_email_html(order_data)
         
-        params = {
-            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
-            "to": [INTERNAL_EMAIL],
-            "subject": f"新訂單 - {order_data['orderId']}",
-            "html": html
-        }
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
+            to=[{"email": INTERNAL_EMAIL}],
+            subject=f"新訂單 - {order_data['orderId']}",
+            html_content=html
+        )
         
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 內部訂單 Email 已發送: {email}")
+        result = brevo_api.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 內部訂單 Email 已發送: {result}")
         return True
         
     except Exception as e:
@@ -905,20 +908,20 @@ def send_internal_stl_email(order_data, stl_files):
                     content = base64.b64encode(f.read()).decode()
                     attachments.append({
                         "filename": filename,
-                        "content": content
+                        "content": content.decode('utf-8')
                     })
                 logger.info(f"📎 附加: {filename}")
         
-        params = {
-            "from": f"{SENDER_NAME} <{SENDER_EMAIL}>",
-            "to": [INTERNAL_EMAIL],
-            "subject": f"STL 已完成 - {order_data['orderId']}",
-            "html": html,
-            "attachments": attachments
-        }
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
+            to=[{"email": INTERNAL_EMAIL}],
+            subject=f"STL 已完成 - {order_data['orderId']}",
+            html_content=html,
+            attachment=attachments if attachments else None
+        )
         
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 內部 STL Email 已發送: {email}")
+        result = brevo_api.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 內部 STL Email 已發送: {result}")
         return True
         
     except Exception as e:
@@ -2100,16 +2103,15 @@ def send_order_confirmation_with_concepts(order_id, concepts):
         </html>
         """
         
-        # 使用 Resend 發送
-        import resend
-        resend.api_key = os.getenv('RESEND_API_KEY')
+        # 使用 Brevo 發送
+        send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+            sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
+            to=[{"email": order.get('Email', '')}],
+            subject=f"DUET 訂單確認 #{order_id}",
+            html_content=email_html
+        )
         
-        resend.Emails.send({
-            "from": "service@brendonchen.com",
-            "to": [order.get('Email', '')],
-            "subject": f"DUET 訂單確認 #{order_id}",
-            "html": email_html
-        })
+        brevo_api.send_transac_email(send_smtp_email)
         
         print(f"Confirmation email sent for order {order_id}")
         
