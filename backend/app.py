@@ -2,7 +2,7 @@
 DUET Backend - 完整版（使用 Resend Email）
 包含：STL 生成、綠界金流、Resend Email、隊列系統
 """
-
+from ai_service import process_ai_chat, generate_design_concept
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
@@ -1580,6 +1580,272 @@ logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
 
 # 啟動背景 Worker
 start_background_worker()
+# ===== 在現有路由後面添加以下新端點 =====
+
+@app.route('/api/ai-chat', methods=['POST'])
+def api_ai_chat():
+    """
+    AI 對話端點
+    接收對話歷史，返回 AI 回應
+    """
+    try:
+        data = request.json
+        conversation_history = data.get('conversation_history', [])
+        
+        if not conversation_history:
+            return jsonify({
+                'success': False,
+                'error': '缺少對話歷史'
+            }), 400
+        
+        # 處理 AI 對話
+        result = process_ai_chat(conversation_history)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"AI Chat API Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/generate-design-concept', methods=['POST'])
+def api_generate_design_concept():
+    """
+    生成設計理念端點
+    基於對話歷史和最終選擇的字體
+    """
+    try:
+        data = request.json
+        
+        # 獲取必要參數
+        conversation = data.get('conversation', [])
+        selected_fonts = data.get('selectedFonts', {})
+        items = data.get('items', [])
+        
+        if not conversation or not selected_fonts or not items:
+            return jsonify({
+                'success': False,
+                'error': '缺少必要參數'
+            }), 400
+        
+        # 從第一個 item 獲取字母
+        first_item = items[0]
+        letters = {
+            'letter1': first_item.get('letter1', ''),
+            'letter2': first_item.get('letter2', '')
+        }
+        
+        # 使用實際選定的字體（不是推薦的字體）
+        final_fonts = {
+            'font1': first_item.get('font1', selected_fonts.get('font1', '')),
+            'font2': first_item.get('font2', selected_fonts.get('font2', ''))
+        }
+        
+        # 生成設計理念
+        result = generate_design_concept(conversation, final_fonts, letters)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'concept': result['concept'],
+                'items': items
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '生成失敗')
+            }), 500
+            
+    except Exception as e:
+        print(f"Design Concept API Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/order/<order_id>', methods=['GET'])
+def get_order(order_id):
+    """
+    獲取訂單詳情
+    用於設計理念生成頁面
+    """
+    try:
+        # 從 Google Sheets 查詢訂單
+        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
+        # 查找訂單
+        orders = sheet.get_all_records()
+        order = None
+        
+        for row in orders:
+            if row.get('訂單編號') == order_id:
+                order = row
+                break
+        
+        if not order:
+            return jsonify({
+                'success': False,
+                'error': '訂單不存在'
+            }), 404
+        
+        # 解析訂單項目（假設存儲為 JSON）
+        items = json.loads(order.get('items', '[]'))
+        
+        # 獲取 AI 諮詢數據（如果有）
+        ai_data_str = order.get('ai_consultation', '')
+        ai_data = json.loads(ai_data_str) if ai_data_str else None
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'customer': {
+                'name': order.get('姓名', ''),
+                'email': order.get('Email', '')
+            },
+            'items': items,
+            'ai_data': ai_data,
+            'status': order.get('狀態', ''),
+            'needs_design_concept': order.get('needs_design_concept', False)
+        })
+        
+    except Exception as e:
+        print(f"Get Order Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/save-design-concepts', methods=['POST'])
+def save_design_concepts():
+    """
+    保存設計理念和卡片選擇
+    """
+    try:
+        data = request.json
+        order_id = data.get('order_id')
+        concepts = data.get('concepts', [])
+        
+        if not order_id or not concepts:
+            return jsonify({
+                'success': False,
+                'error': '缺少必要參數'
+            }), 400
+        
+        # 更新訂單記錄
+        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
+        # 找到訂單行
+        cell = sheet.find(order_id)
+        if cell:
+            row_index = cell.row
+            
+            # 更新設計理念數據
+            concepts_json = json.dumps(concepts, ensure_ascii=False)
+            
+            # 假設有 "design_concepts" 欄位
+            sheet.update_cell(row_index, 15, concepts_json)  # 調整欄位索引
+            
+            # 發送確認郵件（包含設計理念）
+            send_order_confirmation_with_concepts(order_id, concepts)
+            
+            return jsonify({
+                'success': True,
+                'message': '設計理念已保存'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': '找不到訂單'
+            }), 404
+            
+    except Exception as e:
+        print(f"Save Design Concepts Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+def send_order_confirmation_with_concepts(order_id, concepts):
+    """
+    發送包含設計理念的訂單確認郵件
+    """
+    try:
+        # 獲取訂單詳情
+        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
+        orders = sheet.get_all_records()
+        order = None
+        
+        for row in orders:
+            if row.get('訂單編號') == order_id:
+                order = row
+                break
+        
+        if not order:
+            print(f"Order {order_id} not found")
+            return
+        
+        # 構建郵件內容
+        concepts_html = ""
+        for concept in concepts:
+            concepts_html += f"""
+            <div style="margin: 30px 0; padding: 20px; background: #f9f9f9; border-left: 4px solid #d4af37;">
+                <h3 style="color: #d4af37;">{concept['design_signature']}</h3>
+                <p style="line-height: 1.8; color: #333;">{concept['concept_text']}</p>
+                <p style="color: #888; font-size: 14px;">卡片版型：{concept['card_template']}</p>
+            </div>
+            """
+        
+        email_html = f"""
+        <html>
+        <body style="font-family: 'Microsoft JhengHei', sans-serif; padding: 20px;">
+            <h1 style="color: #d4af37;">DUET 訂單確認</h1>
+            <p>親愛的 {order.get('姓名', '')}，</p>
+            <p>感謝您訂購 DUET 訂製珠寶！</p>
+            
+            <h2>您的專屬設計理念</h2>
+            {concepts_html}
+            
+            <p>我們會將設計理念印製成精美卡片，隨作品一起送達。</p>
+            
+            <p style="margin-top: 40px; color: #888;">
+                如有任何問題，請直接回覆此郵件。<br>
+                DUET by BCAG
+            </p>
+        </body>
+        </html>
+        """
+        
+        # 使用 Resend 發送
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+        
+        resend.Emails.send({
+            "from": "service@brendonchen.com",
+            "to": [order.get('Email', '')],
+            "subject": f"DUET 訂單確認 #{order_id}",
+            "html": email_html
+        })
+        
+        print(f"Confirmation email sent for order {order_id}")
+        
+    except Exception as e:
+        print(f"Send Email Error: {e}")
+
+
+# ===== CORS 設定更新（如果需要） =====
+# 確保 CORS 允許前端域名訪問
+# 在現有 CORS 設定中添加：
+# origins=["https://brendonchen.com", "http://localhost:3000"]
 
 # ==========================================
 # 本地開發用

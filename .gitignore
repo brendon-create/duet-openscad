@@ -1,1 +1,8 @@
-.DS_Store
+.env
+venv/
+__pycache__/
+*.pyc
+*.stl
+*.scad
+node_modules/
+credentials.json
