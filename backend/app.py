@@ -2,6 +2,17 @@
 DUET Backend - 完整版（使用 Resend Email）
 包含：STL 生成、綠界金流、Resend Email、隊列系統
 """
+# ========== DEBUG 開始 ==========
+import os
+import sys
+print("=" * 60)
+print("🔍 當前目錄:", os.getcwd())
+print("📂 目錄內容:", os.listdir('.'))
+print("✅ ai_service.py 存在:", os.path.exists('ai_service.py'))
+if os.path.exists('ai_service.py'):
+    print("📄 大小:", os.path.getsize('ai_service.py'), "bytes")
+print("=" * 60)
+# ========== DEBUG 結束 ==========
 from ai_service import process_ai_chat, generate_design_concept
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
