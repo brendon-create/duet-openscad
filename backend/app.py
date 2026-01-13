@@ -96,6 +96,71 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 - 保持自然對話，不要機械式追問
 - 適時給予認可和共鳴
 
+---
+
+## 對話技巧（非常重要！）
+
+### 像真實設計師一樣對話：
+
+1. **從回答中抓關鍵詞延伸**
+   - ❌ 客戶說「我們都很執著」→ AI 問「還有其他欣賞的特質嗎？」（重複）
+   - ✅ 客戶說「我們都很執著」→ AI 問「這種執著在你們相處中是怎麼展現的？」（延伸）
+   
+   - ❌ 客戶說「相遇很難得」→ AI 問「那你最欣賞她什麼？」（忽略）
+   - ✅ 客戶說「相遇很難得」→ AI 問「你提到相遇很難得，是因為之前也遇過一些不適合的人嗎？」（抓住關鍵）
+
+2. **建立對話流，不要突然跳題**
+   - 每個回應都要承接上一句
+   - 用「剛剛你提到...」「聽起來...」「這讓我想到...」
+   - 不要從「第一次約會很緊張」直接跳到「那這兩個字母代表什麼？」
+
+3. **展現同理心與共鳴**
+   - ❌ 「所以這個作品對你們很有意義對吧？」（說教式）
+   - ✅ 「經歷過才更懂得珍惜，這種感受我理解。」（共鳴）
+   
+   - ❌ 「還有嗎？」（催促）
+   - ✅ 「這很動人。能多說一點嗎？」（鼓勵）
+
+4. **避免重複詞彙**
+   - 如果已經問過「欣賞」，不要再用「欣賞」
+   - 換個角度：「這些特質在你們日常相處中是怎麼呈現的？」
+
+5. **問開放式問題**
+   - ❌ 「還有嗎？」「是嗎？」（封閉）
+   - ✅ 「有沒有什麼時刻特別能代表這一點？」「能多分享一點嗎？」（開放）
+
+### 對話範例：
+
+**範例 1：自然延伸**
+```
+客戶：「她對愛情很執著，我也是，所以我們相遇很難得」
+❌ 不好：「除了執著之外，還有其他特質嗎？」
+✅ 好：「兩個同樣認真的人相遇確實難得。這種執著在你們相處中是怎麼展現的？」
+```
+
+**範例 2：從故事挖掘細節**
+```
+客戶：「第一次約會我超緊張」
+❌ 不好：「那這兩個字母代表什麼？」
+✅ 好：「哈哈，第一次約會緊張是正常的。那次約會後來怎麼樣？有沒有發生什麼讓你印象深刻的事？」
+```
+
+**範例 3：共鳴與引導**
+```
+客戶：「我們都經歷過感情挫折」
+❌ 不好：「所以這個作品很重要對吧？」
+✅ 好：「經歷過才更懂得珍惜。因為這些經歷，你們現在的相處有什麼不一樣嗎？」
+```
+
+**範例 4：避免重複**
+```
+上一題已經問過「欣賞特質」
+❌ 不好：「還有其他欣賞的特質嗎？」
+✅ 好：「剛剛你提到她對愛情的執著，這在你們的關係中扮演什麼角色？」
+```
+
+---
+
 ### 第四階段：確認與補充（1 個問題）
 在準備推薦字體前，詢問：
 「在我為您推薦字體之前，還有什麼想補充的嗎？例如您偏好的風格、或是任何其他想法？」
@@ -326,172 +391,6 @@ Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, All
 {
   "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。經歷過感情的挫折，讓他們更懂得珍惜彼此。\n\n簡潔的 Jost 代表 Brendon 直接而堅定的個性，優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質。兩種字體的對比展現了他們關係中的互補與和諧。\n\n每次配戴時，都能想起這份難得的相遇，提醒彼此不管發生什麼都要在一起，好好珍惜這份得來不易的幸福。"
 }
-"""
-
-# 精選字體列表（基於問卷分析，20種代表性字體）
-CURATED_FONTS = {
-    "elegant_serif": ["Playfair Display", "Cormorant Garamond", "EB Garamond", "DM Serif Text"],
-    "modern_sans": ["Montserrat", "Poppins", "Jost", "Outfit"],
-    "handwritten": ["Allura", "Alex Brush", "Sacramento", "Great Vibes", "Dancing Script"],
-    "display": ["Abril Fatface", "Bebas Neue", "Audiowide", "Cinzel"],
-    "geometric": ["Advent Pro", "Space Grotesk", "Orbitron"]
-}
-
-ALL_FONTS = [font for category in CURATED_FONTS.values() for font in category]
-
-
-def process_ai_chat(conversation_history):
-    """
-    處理 AI 對話
-    """
-    try:
-        # 呼叫 Claude API
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1000,
-            system=SYSTEM_PROMPT,
-            messages=conversation_history
-        )
-        
-        ai_message = response.content[0].text
-        
-        # 檢查是否完成對話（尋找 JSON 輸出）
-        if "{" in ai_message and "}" in ai_message:
-            # 提取 JSON
-            json_start = ai_message.find("{")
-            json_end = ai_message.rfind("}") + 1
-            json_str = ai_message[json_start:json_end]
-            
-            try:
-                summary = json.loads(json_str)
-                
-                # 生成字體推薦
-                recommended_fonts = recommend_fonts(summary)
-                
-                return {
-                    "completed": True,
-                    "summary": summary,
-                    "recommended_fonts": recommended_fonts,
-                    "letters": summary.get("letters", {}),
-                    "emotional_keywords": summary.get("emotional_keywords", [])
-                }
-            except json.JSONDecodeError:
-                pass
-        
-        # 未完成，繼續對話
-        return {
-            "completed": False,
-            "message": ai_message
-        }
-        
-    except Exception as e:
-        print(f"AI Chat Error: {e}")
-        return {
-            "completed": False,
-            "message": "抱歉，發生了一些問題。請稍後再試。"
-        }
-
-
-def recommend_fonts(summary):
-    """
-    根據對話摘要推薦字體
-    基於問卷分析的邏輯
-    """
-    style_hints = summary.get("style_hints", [])
-    emotional_keywords = summary.get("emotional_keywords", [])
-    relationship_type = summary.get("relationship_type", "")
-    
-    # 情感關鍵詞映射
-    keyword_map = {
-        "溫柔": "handwritten",
-        "優雅": "elegant_serif",
-        "現代": "modern_sans",
-        "活潑": "display",
-        "簡約": "modern_sans",
-        "經典": "elegant_serif",
-        "科技": "geometric",
-        "力量": "display",
-        "浪漫": "handwritten"
-    }
-    
-    # 根據關鍵詞選擇字體類別
-    categories = []
-    for keyword in emotional_keywords + style_hints:
-        for key, cat in keyword_map.items():
-            if key in keyword:
-                categories.append(cat)
-    
-    # 如果沒有匹配，使用默認推薦（基於關係類型）
-    if not categories:
-        if "伴侶" in relationship_type:
-            categories = ["handwritten", "elegant_serif"]
-        elif "親子" in relationship_type:
-            categories = ["modern_sans", "elegant_serif"]
-        else:
-            categories = ["elegant_serif", "modern_sans"]
-    
-    # 選擇字體
-    font1_category = categories[0] if categories else "handwritten"
-    font2_category = categories[1] if len(categories) > 1 else "modern_sans"
-    
-    # 確保兩個字體來自不同類別（形成對比）
-    if font1_category == font2_category:
-        if font1_category == "handwritten":
-            font2_category = "modern_sans"
-        else:
-            font2_category = "handwritten"
-    
-    font1 = CURATED_FONTS[font1_category][0]
-    font2 = CURATED_FONTS[font2_category][0]
-    
-    # 生成推薦理由
-    reason_templates = {
-        "handwritten": "優雅柔美的手寫字體，適合表達溫柔與浪漫的情感",
-        "elegant_serif": "經典襯線體，展現永恆與優雅的氣質",
-        "modern_sans": "現代簡約字體，呈現俐落與當代美感",
-        "display": "粗獷有力的展示字體，象徵堅定與力量",
-        "geometric": "幾何造型字體，展現科技感與前衛精神"
-    }
-    
-    return {
-        "font1": font1,
-        "font1_reason": reason_templates.get(font1_category, "適合您的設計風格"),
-        "font2": font2,
-        "font2_reason": reason_templates.get(font2_category, "與第一個字母形成完美對比")
-    }
-
-
-def generate_design_concept(conversation_history, selected_fonts, letters):
-    """
-    生成設計理念
-    基於完整對話和最終選定的字體
-    """
-    try:
-        # 準備 prompt
-        concept_prompt = f"""
-基於以下顧客的對話內容，為他們的 DUET 訂製珠寶創作一段溫馨、真誠的設計理念。
-
-對話摘要：
-{json.dumps(conversation_history, ensure_ascii=False, indent=2)}
-
-最終設計：
-- 字母：{letters['letter1']} + {letters['letter2']}
-- 字體：{selected_fonts['font1']} × {selected_fonts['font2']}
-
-請創作約 150-200 字的設計理念，包含：
-1. 標題（用《》包裹，3-6個字）
-2. 字母意義的詮釋
-3. 字體選擇的象徵意義
-4. 引用顧客分享的故事或情感
-5. 作品的精神內涵
-
-風格要求：
-- 溫暖、真誠、有詩意
-- 避免陳腔濫調
-- 融入顧客的真實故事
-- 讓人感動但不矯情
-
-請直接輸出設計理念文案，不需要其他說明。
 """
         
         response = client.messages.create(
@@ -2085,31 +1984,100 @@ logger.info(f"💳 綠界: {ECPAY_CONFIG['MerchantID']}")
 start_background_worker()
 # ===== 在現有路由後面添加以下新端點 =====
 
-@app.route('/api/ai-chat', methods=['POST'])
-def api_ai_chat():
+# ============================================================
+# AI 諮詢對話 API（修正版 - 替換到 app.py）
+# ============================================================
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
     """
-    AI 對話端點
-    接收對話歷史，返回 AI 回應
+    AI 諮詢對話 API
     """
     try:
         data = request.json
-        conversation_history = data.get('conversation_history', [])
+        user_message = data.get('message', '')
+        conversation_history = data.get('history', [])
         
-        if not conversation_history:
+        # 構建訊息
+        messages = conversation_history + [
+            {
+                "role": "user",
+                "content": user_message
+            }
+        ]
+        
+        # 呼叫 Claude API
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            system=SYSTEM_PROMPT,
+            messages=messages
+        )
+        
+        ai_response = response.content[0].text
+        
+        # 判斷是否完成（只有當輸出 JSON 時才算完成）
+        is_json_response = False
+        result = None
+        
+        try:
+            # 檢查是否是 JSON 回應
+            json_str = ai_response.strip()
+            
+            # 必須以 { 或 ```json 開頭才可能是 JSON
+            if json_str.startswith('{') or json_str.startswith('```json') or json_str.startswith('```'):
+                # 清理 Markdown 標記
+                if json_str.startswith('```json'):
+                    json_str = json_str[7:]
+                if json_str.startswith('```'):
+                    json_str = json_str[3:]
+                if json_str.endswith('```'):
+                    json_str = json_str[:-3]
+                json_str = json_str.strip()
+                
+                # 嘗試解析
+                parsed = json.loads(json_str)
+                
+                # 檢查是否包含推薦欄位（這才是真正的完成標誌）
+                if 'recommendations' in parsed and 'letters' in parsed:
+                    is_json_response = True
+                    result = parsed
+                    
+                    # 確保有 conversationSummary
+                    if 'conversationSummary' not in result:
+                        result['conversationSummary'] = {}
+                    
+                    logger.info('✅ 檢測到完整 JSON 推薦，對話完成')
+                else:
+                    logger.info('⚠️ JSON 但缺少推薦欄位，繼續對話')
+                    is_json_response = False
+                    
+        except (json.JSONDecodeError, ValueError) as e:
+            # 不是 JSON 或解析失敗，繼續對話
+            logger.info(f'📝 對話進行中（非 JSON 回應）')
+            is_json_response = False
+        
+        # 回傳結果
+        if is_json_response and result:
+            # 完成推薦
             return jsonify({
-                'success': False,
-                'error': '缺少對話歷史'
-            }), 400
-        
-        # 處理 AI 對話
-        result = process_ai_chat(conversation_history)
-        
-        return jsonify(result)
+                'completed': True,
+                'message': ai_response,
+                **result
+            })
+        else:
+            # 繼續對話
+            return jsonify({
+                'completed': False,
+                'message': ai_response
+            })
         
     except Exception as e:
-        print(f"AI Chat API Error: {e}")
+        logger.error(f'❌ Chat API 錯誤: {str(e)}')
+        logger.error(f'錯誤詳情: {traceback.format_exc()}')
         return jsonify({
-            'success': False,
+            'completed': False,
+            'message': '抱歉，發生了一些問題。請重新整理頁面再試一次。',
             'error': str(e)
         }), 500
 
