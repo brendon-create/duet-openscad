@@ -1965,7 +1965,7 @@ start_background_worker()
 # AI 諮詢對話 API（修正版 - 替換到 app.py）
 # ============================================================
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('/api/ai-consultant', methods=['POST'])
 def chat():
     """
     AI 諮詢對話 API
