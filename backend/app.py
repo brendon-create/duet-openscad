@@ -391,6 +391,7 @@ Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, All
 {
   "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。經歷過感情的挫折，讓他們更懂得珍惜彼此。\n\n簡潔的 Jost 代表 Brendon 直接而堅定的個性，優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質。兩種字體的對比展現了他們關係中的互補與和諧。\n\n每次配戴時，都能想起這份難得的相遇，提醒彼此不管發生什麼都要在一起，好好珍惜這份得來不易的幸福。"
 }
+```
 """
         
         response = client.messages.create(
