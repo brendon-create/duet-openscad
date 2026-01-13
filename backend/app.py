@@ -393,30 +393,6 @@ Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, All
 }
 ```
 """
-        
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=800,
-            messages=[{
-                "role": "user",
-                "content": concept_prompt
-            }]
-        )
-        
-        concept_text = response.content[0].text.strip()
-        
-        return {
-            "success": True,
-            "concept": concept_text
-        }
-        
-    except Exception as e:
-        print(f"Design Concept Error: {e}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
 
 # ==========================================
 # Flask 應用初始化
