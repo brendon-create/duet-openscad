@@ -1888,10 +1888,17 @@ def payment_success():
     padding:40px;border-radius:15px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
     .success-icon{font-size:60px;color:#4CAF50;margin-bottom:20px}h1{color:#333;margin-bottom:10px}
     p{color:#666;line-height:1.6}.btn{display:inline-block;margin-top:20px;padding:12px 30px;
-    background:#667eea;color:white;text-decoration:none;border-radius:5px}</style></head>
+    background:#667eea;color:white;text-decoration:none;border-radius:5px}</style>
+    <script>
+    setTimeout(() => {
+        localStorage.setItem('duet_payment_success', 'true');
+        window.location.href = 'https://brendonchen.com/duet';
+    }, 3000);
+    </script>
+    </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
-    <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>我們將盡快為您製作產品。</p>
-    <a href="/" class="btn">返回首頁</a></div></body></html>'''
+    <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
+    </div></body></html>'''
 
 # ==========================================
 # 測試端點
