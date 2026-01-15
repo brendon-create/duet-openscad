@@ -2,17 +2,15 @@
 DUET Backend - 完整版（使用 Resend Email）
 包含：STL 生成、綠界金流、Resend Email、隊列系統
 """
-
 # ========== DEBUG 開始 ==========
 import os
 import sys
-
 print("=" * 60)
 print("🔍 當前目錄:", os.getcwd())
-print("📂 目錄內容:", os.listdir("."))
-print("✅ ai_service.py 存在:", os.path.exists("ai_service.py"))
-if os.path.exists("ai_service.py"):
-    print("📄 大小:", os.path.getsize("ai_service.py"), "bytes")
+print("📂 目錄內容:", os.listdir('.'))
+print("✅ ai_service.py 存在:", os.path.exists('ai_service.py'))
+if os.path.exists('ai_service.py'):
+    print("📄 大小:", os.path.getsize('ai_service.py'), "bytes")
 print("=" * 60)
 # ========== DEBUG 結束 ==========
 from flask import Flask, request, jsonify, send_file
@@ -31,7 +29,6 @@ from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
-
 # ai_service.py - DUET AI 諮詢服務
 
 import anthropic
@@ -405,7 +402,8 @@ app = Flask(__name__)
 CORS(app)
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -413,7 +411,6 @@ logger = logging.getLogger(__name__)
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
-
     GOOGLE_SHEETS_ENABLED = True
 except ImportError:
     GOOGLE_SHEETS_ENABLED = False
@@ -428,46 +425,45 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 # 綠界配置
 ECPAY_CONFIG = {
-    "MerchantID": "3002607",  # ✅ 綠界官方測試商店代號
-    "HashKey": "pwFHCqoQZGmho4w6",  # ✅ 測試 HashKey
-    "HashIV": "EkRm7iFT261dpevs",  # ✅ 測試 HashIV
-    "PaymentURL": "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",  # ✅ 測試站
+    'MerchantID': '3002607',  # ✅ 綠界官方測試商店代號
+    'HashKey': 'pwFHCqoQZGmho4w6',  # ✅ 測試 HashKey
+    'HashIV': 'EkRm7iFT261dpevs',  # ✅ 測試 HashIV
+    'PaymentURL': 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5'  # ✅ 測試站
 }
 
 # Resend Email 配置
-RESEND_API_KEY = "re_Vy8zWUJ2_KhUfFBXD5qiPEVPPsLAghgGr"
-SENDER_EMAIL = "service@brendonchen.com"
-SENDER_NAME = "DUET 客製珠寶"
-INTERNAL_EMAIL = "brendon@brendonchen.com"
+RESEND_API_KEY = 're_Vy8zWUJ2_KhUfFBXD5qiPEVPPsLAghgGr'
+SENDER_EMAIL = 'service@brendonchen.com'
+SENDER_NAME = 'DUET 客製珠寶'
+INTERNAL_EMAIL = 'brendon@brendonchen.com'
 
 # 設定 Brevo API Key
 configuration = sib_api_v3_sdk.Configuration()
-configuration.api_key["api-key"] = os.getenv("BREVO_API_KEY")
-api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
-    sib_api_v3_sdk.ApiClient(configuration)
-)
+configuration.api_key['api-key'] = os.getenv('BREVO_API_KEY')
+api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
 # Google Sheets 配置（訂單記錄）
-SHEETS_ID = os.environ.get("SHEETS_ID", "")  # 訂單記錄用的 Sheet ID
-GOOGLE_CREDENTIALS_JSON = os.environ.get(
-    "GOOGLE_CREDENTIALS_JSON", ""
-)  # Service Account JSON
+SHEETS_ID = os.environ.get('SHEETS_ID', '')  # 訂單記錄用的 Sheet ID
+GOOGLE_CREDENTIALS_JSON = os.environ.get('GOOGLE_CREDENTIALS_JSON', '')  # Service Account JSON
 
 # Google Sheets 配置（優惠碼管理）
 GOOGLE_SHEETS_CONFIG = {
-    "enabled": os.environ.get("GOOGLE_SHEETS_ENABLED", "false").lower() == "true",
-    "sheet_id": os.environ.get("PROMO_SHEET_ID", ""),
-    "range_name": "A2:I",  # 不指定 Sheet 名稱，使用第一個 sheet
-    "cache_duration": 3600,  # 快取 1 小時
+    'enabled': os.environ.get('GOOGLE_SHEETS_ENABLED', 'false').lower() == 'true',
+    'sheet_id': os.environ.get('PROMO_SHEET_ID', ''),
+    'range_name': 'A2:I',  # 不指定 Sheet 名稱，使用第一個 sheet
+    'cache_duration': 3600,  # 快取 1 小時
 }
 
 # 優惠碼快取
-PROMO_CODES_CACHE = {"data": {}, "last_updated": None}
+PROMO_CODES_CACHE = {
+    'data': {},
+    'last_updated': None
+}
 
 # 目錄配置
-ORDERS_DIR = "orders"
-STL_DIR = "stl_files"
-QUEUE_DIR = "stl_queue"
+ORDERS_DIR = 'orders'
+STL_DIR = 'stl_files'
+QUEUE_DIR = 'stl_queue'
 os.makedirs(ORDERS_DIR, exist_ok=True)
 os.makedirs(STL_DIR, exist_ok=True)
 os.makedirs(QUEUE_DIR, exist_ok=True)
@@ -479,144 +475,138 @@ os.makedirs(QUEUE_DIR, exist_ok=True)
 # ⚠️ 優惠碼完全由 Google Sheets 管理
 # 請在 Google Sheets 中設定優惠碼
 # Sheet ID: 1qituunsVbUJmJCeoPKKOK02LjyNqzN2AYOuZ_D920IU
-#
+# 
 # 不再使用硬編碼的預設優惠碼！
 # 所有優惠碼都從 Google Sheets 載入
 
 PROMO_CODES = {}  # 不使用預設值，完全依賴 Google Sheets
 
-
 def load_promo_codes_from_sheets():
     """從 Google Sheets 載入優惠碼"""
     global PROMO_CODES_CACHE
-
+    
     # 檢查是否啟用 Google Sheets
-    if not GOOGLE_SHEETS_CONFIG["enabled"]:
+    if not GOOGLE_SHEETS_CONFIG['enabled']:
         logger.warning("⚠️ Google Sheets 未啟用，無優惠碼可用")
         logger.warning("⚠️ 請在 Render 設定 GOOGLE_SHEETS_ENABLED=true")
         # 返回快取（如果有）或空字典
-        return PROMO_CODES_CACHE["data"] if PROMO_CODES_CACHE["data"] else {}
-
+        return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
+    
     # 檢查快取是否有效（1小時內）
-    if PROMO_CODES_CACHE["last_updated"]:
-        cache_age = (datetime.now() - PROMO_CODES_CACHE["last_updated"]).total_seconds()
-        if cache_age < GOOGLE_SHEETS_CONFIG["cache_duration"]:
+    if PROMO_CODES_CACHE['last_updated']:
+        cache_age = (datetime.now() - PROMO_CODES_CACHE['last_updated']).total_seconds()
+        if cache_age < GOOGLE_SHEETS_CONFIG['cache_duration']:
             logger.info(f"📊 使用快取的優惠碼（{int(cache_age)}秒前更新）")
-            return PROMO_CODES_CACHE["data"]
-
+            return PROMO_CODES_CACHE['data']
+    
     try:
         logger.info("📊 從 Google Sheets 載入優惠碼...")
-
+        
         # 載入憑證
         if not GOOGLE_CREDENTIALS_JSON:
             logger.error("❌ Google Sheets 憑證未設定")
             logger.error("❌ 請在 Render 設定 GOOGLE_CREDENTIALS_JSON")
             # 返回快取（如果有）或空字典
-            return PROMO_CODES_CACHE["data"] if PROMO_CODES_CACHE["data"] else {}
-
+            return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
+        
         if GOOGLE_SHEETS_ENABLED:
             import json
             from google.oauth2 import service_account
             from googleapiclient.discovery import build
-
+            
             # 解析憑證
             creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
             credentials = service_account.Credentials.from_service_account_info(
                 creds_dict,
-                scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+                scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
             )
-
+            
             # 建立 Sheets API 服務
-            service = build("sheets", "v4", credentials=credentials)
+            service = build('sheets', 'v4', credentials=credentials)
             sheet = service.spreadsheets()
-
+            
             # 讀取資料
-            result = (
-                sheet.values()
-                .get(
-                    spreadsheetId=GOOGLE_SHEETS_CONFIG["sheet_id"],
-                    range=GOOGLE_SHEETS_CONFIG["range_name"],
-                )
-                .execute()
-            )
-
-            values = result.get("values", [])
-
+            result = sheet.values().get(
+                spreadsheetId=GOOGLE_SHEETS_CONFIG['sheet_id'],
+                range=GOOGLE_SHEETS_CONFIG['range_name']
+            ).execute()
+            
+            values = result.get('values', [])
+            
             if not values:
                 logger.warning("⚠️ Google Sheets 沒有資料")
                 logger.warning("⚠️ 請在 Sheet 中添加優惠碼資料")
                 # 返回快取（如果有）或空字典
-                return PROMO_CODES_CACHE["data"] if PROMO_CODES_CACHE["data"] else {}
-
+                return PROMO_CODES_CACHE['data'] if PROMO_CODES_CACHE['data'] else {}
+            
             # 解析資料
             promo_codes = {}
             for row in values:
                 if len(row) < 7:  # 至少需要 7 個欄位
                     continue
-
+                
                 code = row[0].strip().upper()
                 if not code:
                     continue
-
+                
                 promo_codes[code] = {
-                    "type": row[1].lower() if len(row) > 1 else "percentage",
-                    "value": float(row[2]) if len(row) > 2 else 0,
-                    "minAmount": float(row[3]) if len(row) > 3 else 0,
-                    "validUntil": row[5] if len(row) > 5 else "2099-12-31",
-                    "active": row[6].upper() == "TRUE" if len(row) > 6 else True,
-                    "description": row[7] if len(row) > 7 else "",
+                    'type': row[1].lower() if len(row) > 1 else 'percentage',
+                    'value': float(row[2]) if len(row) > 2 else 0,
+                    'minAmount': float(row[3]) if len(row) > 3 else 0,
+                    'validUntil': row[5] if len(row) > 5 else '2099-12-31',
+                    'active': row[6].upper() == 'TRUE' if len(row) > 6 else True,
+                    'description': row[7] if len(row) > 7 else '',
                 }
-
+            
             # 更新快取
-            PROMO_CODES_CACHE["data"] = promo_codes
-            PROMO_CODES_CACHE["last_updated"] = datetime.now()
-
+            PROMO_CODES_CACHE['data'] = promo_codes
+            PROMO_CODES_CACHE['last_updated'] = datetime.now()
+            
             logger.info(f"✅ 已載入 {len(promo_codes)} 個優惠碼")
             return promo_codes
-
+            
     except Exception as e:
         logger.error(f"❌ 從 Google Sheets 載入優惠碼失敗: {e}")
         logger.info("📊 嘗試使用快取的優惠碼")
         # 返回快取（如果有）或空字典
-        if PROMO_CODES_CACHE["data"]:
+        if PROMO_CODES_CACHE['data']:
             logger.info(f"✅ 使用快取的 {len(PROMO_CODES_CACHE['data'])} 個優惠碼")
-            return PROMO_CODES_CACHE["data"]
+            return PROMO_CODES_CACHE['data']
         else:
             logger.error("❌ 無快取可用，無優惠碼可用")
             return {}
 
-
 def validate_promo_code(promo_code, original_total):
     """
     驗證優惠碼並計算折扣金額
-
+    
     Returns:
         tuple: (is_valid, discount_amount, promo_info, error_message)
     """
     if not promo_code:
         return False, 0, None, None
-
+    
     code = promo_code.upper().strip()
-
+    
     # 動態載入優惠碼（會使用快取）
     promo_codes = load_promo_codes_from_sheets()
-
+    
     # 檢查優惠碼是否存在
     if code not in promo_codes:
-        return False, 0, None, "無效的優惠碼"
-
+        return False, 0, None, '無效的優惠碼'
+    
     promo = promo_codes[code]
-
+    
     # 檢查是否啟用
-    if not promo.get("active", False):
-        return False, 0, None, "此優惠碼已失效"
-
+    if not promo.get('active', False):
+        return False, 0, None, '此優惠碼已失效'
+    
     # 檢查有效期限
-    valid_until = promo.get("validUntil")
+    valid_until = promo.get('validUntil')
     if valid_until:
         try:
             # 支持多種日期格式
-            date_formats = ["%Y-%m-%d", "%Y/%m/%d", "%Y/%m/%d", "%Y-%m-%d"]
+            date_formats = ['%Y-%m-%d', '%Y/%m/%d', '%Y/%m/%d', '%Y-%m-%d']
             expiry_date = None
             for fmt in date_formats:
                 try:
@@ -624,174 +614,164 @@ def validate_promo_code(promo_code, original_total):
                     break
                 except:
                     continue
-
+            
             if expiry_date and datetime.now() > expiry_date:
-                return False, 0, None, "此優惠碼已過期"
+                return False, 0, None, '此優惠碼已過期'
         except:
             pass
-
+    
     # 檢查最低消費金額
-    min_amount = promo.get("minAmount", 0)
+    min_amount = promo.get('minAmount', 0)
     if original_total < min_amount:
-        return False, 0, None, f"此優惠碼需滿 NT$ {min_amount:,} 才可使用"
-
+        return False, 0, None, f'此優惠碼需滿 NT$ {min_amount:,} 才可使用'
+    
     # 計算折扣
     discount = 0
-    if promo["type"] == "percentage":
-        discount = int(original_total * promo["value"] / 100)
-    elif promo["type"] == "fixed":
-        discount = promo["value"]
-
+    if promo['type'] == 'percentage':
+        discount = int(original_total * promo['value'] / 100)
+    elif promo['type'] == 'fixed':
+        discount = promo['value']
+    
     # 確保折扣不超過總金額
     discount = min(discount, original_total)
-
+    
     logger.info(f"✅ 優惠碼驗證成功: {code}, 折扣: NT$ {discount}")
-
+    
     return True, discount, promo, None
-
 
 # ==========================================
 # 訂單管理（獨立檔案儲存）
 # ==========================================
 
-
 def save_order(order_id, order_data):
     """儲存訂單到獨立檔案"""
-    filepath = os.path.join(ORDERS_DIR, f"{order_id}.json")
-    with open(filepath, "w", encoding="utf-8") as f:
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
+    with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(order_data, f, ensure_ascii=False, indent=2)
     logger.info(f"✅ 訂單已儲存: {order_id}")
 
-
 def load_order(order_id):
     """讀取訂單"""
-    filepath = os.path.join(ORDERS_DIR, f"{order_id}.json")
+    filepath = os.path.join(ORDERS_DIR, f'{order_id}.json')
     if not os.path.exists(filepath):
         return None
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
-
 
 def update_order_status(order_id, status, payment_data=None):
     """更新訂單狀態"""
     order = load_order(order_id)
     if not order:
         return False
-    order["status"] = status
-    order["updated_at"] = datetime.now().isoformat()
+    order['status'] = status
+    order['updated_at'] = datetime.now().isoformat()
     if payment_data:
-        order["payment_data"] = payment_data
+        order['payment_data'] = payment_data
     save_order(order_id, order)
     logger.info(f"📝 訂單狀態: {order_id} → {status}")
     return True
 
-
 # ==========================================
 # Google Sheets 整合
 # ==========================================
-
 
 def save_to_google_sheets(order_data):
     """儲存訂單到 Google Sheets"""
     if not GOOGLE_SHEETS_ENABLED or not SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
         logger.warning("⚠️ Google Sheets 未啟用，跳過")
         return
-
+    
     try:
         # 載入憑證
         import tempfile
-
-        creds_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json")
+        creds_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json')
         creds_file.write(GOOGLE_CREDENTIALS_JSON)
         creds_file.close()
-
+        
         creds = service_account.Credentials.from_service_account_file(
-            creds_file.name, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            creds_file.name,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
         )
-        service = build("sheets", "v4", credentials=creds)
-
+        service = build('sheets', 'v4', credentials=creds)
+        
         # 準備資料行
-        items = order_data.get("items", [])
-        item1 = json.dumps(items[0], ensure_ascii=False) if len(items) > 0 else ""
-        item2 = json.dumps(items[1], ensure_ascii=False) if len(items) > 1 else ""
-        item3 = json.dumps(items[2], ensure_ascii=False) if len(items) > 2 else ""
-
+        items = order_data.get('items', [])
+        item1 = json.dumps(items[0], ensure_ascii=False) if len(items) > 0 else ''
+        item2 = json.dumps(items[1], ensure_ascii=False) if len(items) > 1 else ''
+        item3 = json.dumps(items[2], ensure_ascii=False) if len(items) > 2 else ''
+        
         # 原始金額和結帳金額
-        original_total = order_data.get("originalTotal", order_data.get("total", 0))
-        final_total = order_data.get("total", 0)
-        promo_code = order_data.get("promoCode", "")
-
+        original_total = order_data.get('originalTotal', order_data.get('total', 0))
+        final_total = order_data.get('total', 0)
+        promo_code = order_data.get('promoCode', '')
+        
         row = [
-            order_data.get("orderId", ""),  # A: 訂單編號
-            order_data.get("userInfo", {}).get("name", ""),  # B: 客戶姓名
-            order_data.get("userInfo", {}).get("email", ""),  # C: Email
-            order_data.get("userInfo", {}).get("phone", ""),  # D: 電話
-            item1,  # E: 商品1
-            item2,  # F: 商品2
-            item3,  # G: 商品3
-            original_total,  # H: 總金額（原價）
-            promo_code,  # I: 優惠碼
-            final_total,  # J: 結帳金額
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # K: 建立時間
-            order_data.get("status", "pending"),  # L: 狀態
+            order_data.get('orderId', ''),                              # A: 訂單編號
+            order_data.get('userInfo', {}).get('name', ''),            # B: 客戶姓名
+            order_data.get('userInfo', {}).get('email', ''),           # C: Email
+            order_data.get('userInfo', {}).get('phone', ''),           # D: 電話
+            item1,                                                      # E: 商品1
+            item2,                                                      # F: 商品2
+            item3,                                                      # G: 商品3
+            original_total,                                             # H: 總金額（原價）
+            promo_code,                                                 # I: 優惠碼
+            final_total,                                                # J: 結帳金額
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
+            order_data.get('status', 'pending')                         # L: 狀態
         ]
-
+        
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range="A:L",  # 不指定分頁名稱
-            valueInputOption="RAW",
-            body={"values": [row]},
+            range='A:L',  # 不指定分頁名稱
+            valueInputOption='RAW',
+            body={'values': [row]}
         ).execute()
-
+        
         logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')}")
-
+        
         # 清理臨時檔案
         os.unlink(creds_file.name)
-
+        
     except Exception as e:
         logger.error(f"❌ Google Sheets 儲存失敗: {e}")
-
 
 # ==========================================
 # 隊列系統
 # ==========================================
 
-
 def add_to_stl_queue(order_id):
     """加入 STL 生成隊列"""
     queue_item = {
-        "order_id": order_id,
-        "added_at": datetime.now().isoformat(),
-        "retry_count": 0,
-        "status": "pending",
+        'order_id': order_id,
+        'added_at': datetime.now().isoformat(),
+        'retry_count': 0,
+        'status': 'pending'
     }
-
-    queue_file = os.path.join(QUEUE_DIR, f"{order_id}.json")
-    with open(queue_file, "w", encoding="utf-8") as f:
+    
+    queue_file = os.path.join(QUEUE_DIR, f'{order_id}.json')
+    with open(queue_file, 'w', encoding='utf-8') as f:
         json.dump(queue_item, f, ensure_ascii=False, indent=2)
-
+    
     logger.info(f"✅ 訂單 {order_id} 已加入 STL 隊列")
-
 
 def get_pending_queue_items():
     """取得待處理的隊列項目"""
     items = []
     try:
         for filename in os.listdir(QUEUE_DIR):
-            if filename.endswith(".json"):
+            if filename.endswith('.json'):
                 filepath = os.path.join(QUEUE_DIR, filename)
                 try:
-                    with open(filepath, "r", encoding="utf-8") as f:
+                    with open(filepath, 'r', encoding='utf-8') as f:
                         item = json.load(f)
-                        if item.get("status") == "pending":
+                        if item.get('status') == 'pending':
                             items.append((filepath, item))
                 except:
                     pass
     except:
         pass
     return items
-
 
 def remove_from_queue(queue_file):
     """從隊列移除"""
@@ -801,152 +781,140 @@ def remove_from_queue(queue_file):
     except:
         pass
 
-
 def process_stl_queue():
     """處理 STL 隊列"""
     items = get_pending_queue_items()
-
+    
     if not items:
         return
-
+    
     logger.info(f"📋 隊列中有 {len(items)} 個待處理項目")
-
+    
     # 每次處理一個
     queue_file, item = items[0]
-    order_id = item["order_id"]
-    retry_count = item.get("retry_count", 0)
-
+    order_id = item['order_id']
+    retry_count = item.get('retry_count', 0)
+    
     logger.info(f"🔨 處理訂單: {order_id}")
-
+    
     try:
         success = generate_and_send_stl(order_id)
-
+        
         if success:
             remove_from_queue(queue_file)
-            update_order_status(order_id, "completed")
+            update_order_status(order_id, 'completed')
             logger.info(f"✅ 訂單 {order_id} 處理完成")
         else:
             if retry_count < 3:
-                item["retry_count"] = retry_count + 1
-                with open(queue_file, "w", encoding="utf-8") as f:
+                item['retry_count'] = retry_count + 1
+                with open(queue_file, 'w', encoding='utf-8') as f:
                     json.dump(item, f, ensure_ascii=False, indent=2)
                 logger.warning(f"⚠️ 訂單 {order_id} 失敗，將重試 ({retry_count + 1}/3)")
             else:
-                item["status"] = "failed"
-                with open(queue_file, "w", encoding="utf-8") as f:
+                item['status'] = 'failed'
+                with open(queue_file, 'w', encoding='utf-8') as f:
                     json.dump(item, f, ensure_ascii=False, indent=2)
-                update_order_status(order_id, "stl_failed")
+                update_order_status(order_id, 'stl_failed')
                 logger.error(f"❌ 訂單 {order_id} 重試 3 次後失敗")
-
+                
     except Exception as e:
         logger.error(f"❌ 處理錯誤: {str(e)}")
-
 
 def stl_queue_worker():
     """背景 Worker"""
     logger.info("🚀 STL Queue Worker 已啟動")
-
+    
     while True:
         try:
             process_stl_queue()
         except Exception as e:
             logger.error(f"Worker 錯誤: {str(e)}")
-
+        
         time.sleep(60)
-
 
 def start_background_worker():
     """啟動背景 Worker（使用文件鎖確保只啟動一次）"""
     import fcntl
-
-    lock_file = "/tmp/duet_worker.lock"
-
+    lock_file = '/tmp/duet_worker.lock'
+    
     try:
         # 嘗試取得鎖
-        lock_fd = open(lock_file, "w")
+        lock_fd = open(lock_file, 'w')
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
+        
         # 成功取得鎖，啟動 Worker
         worker_thread = threading.Thread(target=stl_queue_worker, daemon=True)
         worker_thread.start()
         logger.info("✅ 背景 Worker 已啟動（已取得鎖）")
-
+        
         # 保持文件打開以維持鎖
         app._worker_lock_fd = lock_fd
-
+        
     except IOError:
         # 鎖已被其他進程持有
         logger.info("⏸️ 背景 Worker 已在其他進程中運行，跳過啟動")
-
 
 # ==========================================
 # STL 生成
 # ==========================================
 
-
 def generate_stl_for_item(item):
     """生成 STL"""
     try:
         logger.info(f"🔨 生成 STL: {item['letter1']}{item['letter2']}")
-
+        
         # 只傳送 scad_generator 需要的 9 個參數
         params = {
-            "letter1": item["letter1"],
-            "letter2": item["letter2"],
-            "font1": item["font1"],
-            "font2": item["font2"],
-            "size": item["size"],
-            "bailRelativeX": item.get("bailRelativeX", 0),
-            "bailRelativeY": item.get("bailRelativeY", 0),
-            "bailRelativeZ": item.get("bailRelativeZ", 0),
-            "bailRotation": item.get("bailRotation", 0),
+            'letter1': item['letter1'],
+            'letter2': item['letter2'],
+            'font1': item['font1'],
+            'font2': item['font2'],
+            'size': item['size'],
+            'bailRelativeX': item.get('bailRelativeX', 0),
+            'bailRelativeY': item.get('bailRelativeY', 0),
+            'bailRelativeZ': item.get('bailRelativeZ', 0),
+            'bailRotation': item.get('bailRotation', 0)
         }
-
+        
         scad_content = generate_scad_script(**params)
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".scad", delete=False
-        ) as scad_file:
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
             scad_file.write(scad_content)
             scad_path = scad_file.name
-
-        stl_path = scad_path.replace(".scad", ".stl")
-
-        cmd = ["openscad", "-o", stl_path, "--export-format", "binstl", scad_path]
-
+        
+        stl_path = scad_path.replace('.scad', '.stl')
+        
+        cmd = ['openscad', '-o', stl_path, '--export-format', 'binstl', scad_path]
+        
         env = os.environ.copy()
-        env["DISPLAY"] = ":99"
-
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=180, env=env
-        )
-
+        env['DISPLAY'] = ':99'
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
+        
         try:
             os.unlink(scad_path)
         except:
             pass
-
+        
         if result.returncode != 0 or not os.path.exists(stl_path):
             logger.error(f"❌ STL 生成失敗")
             return None
-
+        
         final_path = os.path.join(STL_DIR, f"{item['id']}.stl")
         import shutil
-
         shutil.copy(stl_path, final_path)
-
+        
         try:
             os.unlink(stl_path)
         except:
             pass
-
+        
         logger.info(f"✅ STL 已生成: {final_path}")
         return final_path
-
+        
     except Exception as e:
         logger.error(f"❌ STL 生成錯誤: {str(e)}")
         return None
-
 
 def generate_and_send_stl(order_id):
     """生成所有 STL 並發送內部 Email-2"""
@@ -954,125 +922,122 @@ def generate_and_send_stl(order_id):
         order = load_order(order_id)
         if not order:
             return False
-
+        
         logger.info(f"🔨 開始生成訂單 {order_id} 的 STL...")
-
+        
         stl_files = []
-        for item in order["items"]:
+        for item in order['items']:
             stl_path = generate_stl_for_item(item)
             if stl_path:
                 stl_files.append(stl_path)
             else:
                 return False
-
+        
         # 發送內部 Email-2（帶 STL）
         email_sent = send_internal_stl_email(order, stl_files)
-
+        
         return email_sent
-
+        
     except Exception as e:
         logger.error(f"❌ generate_and_send_stl 錯誤: {str(e)}")
         return False
-
 
 # ==========================================
 # Email 系統（使用 Resend）
 # ==========================================
 
-
 def send_customer_confirmation_email(order_data):
     """Email 1: 給顧客的確認 Email"""
     try:
-        customer_email = order_data["userInfo"]["email"]
+        customer_email = order_data['userInfo']['email']
+        order_id = order_data['orderId']
         logger.info(f"📧 發送顧客確認 Email: {customer_email}")
-
+        
         html = generate_customer_email_html(order_data)
-
+        
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
             to=[{"email": customer_email}],
             subject=f"DUET 訂單確認 #{order_id}",
-            html_content=email_html,
+            html_content=html
         )
         api_instance.send_transac_email(send_smtp_email)
-
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 顧客確認 Email 已發送: {email}")
+        logger.info(f"✅ 顧客確認 Email 已發送")
         return True
-
+        
     except Exception as e:
         logger.error(f"❌ 顧客 Email 發送失敗: {str(e)}")
         return False
-
 
 def send_internal_order_email(order_data):
     """Email 2: 給內部的訂單通知（無 STL）"""
     try:
         logger.info(f"📧 發送內部訂單通知")
-
+        
         html = generate_internal_order_email_html(order_data)
-
+        
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
             to=[{"email": customer_email}],
             subject=f"DUET 訂單確認 #{order_id}",
-            html_content=email_html,
+            html_content=email_html
         )
         api_instance.send_transac_email(send_smtp_email)
-
+        
         email = resend.Emails.send(params)
         logger.info(f"✅ 內部訂單 Email 已發送: {email}")
         return True
-
+        
     except Exception as e:
         logger.error(f"❌ 內部訂單 Email 發送失敗: {str(e)}")
         return False
 
-
 def send_internal_stl_email(order_data, stl_files):
     """Email 3: 給內部的 STL 完成通知（帶 STL）"""
     try:
+        order_id = order_data['orderId']
         logger.info(f"📧 發送內部 STL Email")
-
+        
         html = generate_internal_stl_email_html(order_data)
-
+        
         # 準備附件
         attachments = []
         for stl_path in stl_files:
             if os.path.exists(stl_path):
                 filename = os.path.basename(stl_path)
-                with open(stl_path, "rb") as f:
+                with open(stl_path, 'rb') as f:
                     content = base64.b64encode(f.read()).decode()
-                    attachments.append({"filename": filename, "content": content})
+                    attachments.append({
+                        "filename": filename,
+                        "content": content
+                    })
                 logger.info(f"📎 附加: {filename}")
-
+        
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
-            to=[{"email": customer_email}],
-            subject=f"DUET 訂單確認 #{order_id}",
-            html_content=email_html,
+            to=[{"email": INTERNAL_EMAIL}],
+            subject=f"STL 已生成 - 訂單 #{order_id}",
+            html_content=html
         )
         api_instance.send_transac_email(send_smtp_email)
-
+        
         email = resend.Emails.send(params)
         logger.info(f"✅ 內部 STL Email 已發送: {email}")
         return True
-
+        
     except Exception as e:
         logger.error(f"❌ 內部 STL Email 發送失敗: {str(e)}")
         return False
-
 
 # ==========================================
 # Email HTML 模板
 # ==========================================
 
-
 def generate_customer_email_html(order_data):
     """顧客確認 Email HTML"""
-    items_html = ""
-    for idx, item in enumerate(order_data["items"], 1):
-        items_html += f"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        items_html += f'''
         <tr>
             <td>{idx}</td>
             <td>{item['letter1']} + {item['letter2']}</td>
@@ -1081,39 +1046,39 @@ def generate_customer_email_html(order_data):
             <td>{item.get('material', 'N/A')}</td>
             <td>{item.get('quantity', 1)}</td>
         </tr>
-        """
-
-    user_info = order_data["userInfo"]
-
+        '''
+    
+    user_info = order_data['userInfo']
+    
     # 處理收件人資訊（支援新舊格式）
-    recipient_name = user_info.get("recipientName", user_info.get("name", "N/A"))
-    recipient_phone = user_info.get("recipientPhone", user_info.get("phone", "N/A"))
-    shipping_address = user_info.get("shippingAddress", user_info.get("address", "N/A"))
-    postal_code = user_info.get("postalCode", "")
-
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
     # 發票資訊
-    invoice_type = user_info.get("invoiceType", "personal")
-    invoice_html = ""
-    if invoice_type == "company":
-        invoice_html = f"""
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_html = ''
+    if invoice_type == 'company':
+        invoice_html = f'''
         <p><strong>發票類型：</strong>公司發票（三聯式）</p>
         <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
         <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
-        """
+        '''
     else:
-        invoice_html = "<p><strong>發票類型：</strong>個人發票（二聯式）</p>"
-
+        invoice_html = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
     # 優惠碼資訊
-    promo_html = ""
-    if order_data.get("promoCode"):
-        promo_html = f"""
+    promo_html = ''
+    if order_data.get('promoCode'):
+        promo_html = f'''
         <div style="background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 10px 0;">
             <p style="margin: 0;"><strong>✅ 已使用優惠碼：</strong>{order_data['promoCode']}</p>
             <p style="margin: 5px 0 0 0; font-size: 14px; color: #666;">{order_data.get('promoDescription', '')}</p>
         </div>
-        """
-
-    html = f"""
+        '''
+    
+    html = f'''
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"><style>
@@ -1198,15 +1163,14 @@ def generate_customer_email_html(order_data):
         </div>
     </body>
     </html>
-    """
+    '''
     return html
-
 
 def generate_internal_order_email_html(order_data):
     """內部訂單通知 Email HTML"""
-    items_html = ""
-    for idx, item in enumerate(order_data["items"], 1):
-        items_html += f"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        items_html += f'''
         <tr>
             <td style="font-weight: bold;">{idx}</td>
             <td style="font-size: 11px;">{item['id']}</td>
@@ -1226,54 +1190,54 @@ def generate_internal_order_email_html(order_data):
                 • Letter2 BBox: W={item.get('letter2BBox', {}).get('width', 0):.2f} × H={item.get('letter2BBox', {}).get('height', 0):.2f} × D={item.get('letter2BBox', {}).get('depth', 0):.2f} mm
             </td>
         </tr>
-        """
-
-    user_info = order_data["userInfo"]
-
+        '''
+    
+    user_info = order_data['userInfo']
+    
     # 處理收件人資訊（支援新舊格式）
-    buyer_name = user_info.get("buyerName", user_info.get("name", "N/A"))
-    buyer_email = user_info.get("buyerEmail", user_info.get("email", "N/A"))
-    buyer_phone = user_info.get("buyerPhone", user_info.get("phone", "N/A"))
-
-    recipient_name = user_info.get("recipientName", user_info.get("name", "N/A"))
-    recipient_phone = user_info.get("recipientPhone", user_info.get("phone", "N/A"))
-
-    shipping_address = user_info.get("shippingAddress", user_info.get("address", "N/A"))
-    postal_code = user_info.get("postalCode", "")
-
+    buyer_name = user_info.get('buyerName', user_info.get('name', 'N/A'))
+    buyer_email = user_info.get('buyerEmail', user_info.get('email', 'N/A'))
+    buyer_phone = user_info.get('buyerPhone', user_info.get('phone', 'N/A'))
+    
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
     # 發票資訊
-    invoice_type = user_info.get("invoiceType", "personal")
-    invoice_info = ""
-    if invoice_type == "company":
-        invoice_info = f"""
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_info = ''
+    if invoice_type == 'company':
+        invoice_info = f'''
         <p><strong>發票類型：</strong>公司發票（三聯式）</p>
         <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
         <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
-        """
+        '''
     else:
-        invoice_info = "<p><strong>發票類型：</strong>個人發票（二聯式）</p>"
-
+        invoice_info = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
     # 優惠碼資訊
-    promo_info = ""
-    if order_data.get("promoCode"):
-        promo_info = f"""
+    promo_info = ''
+    if order_data.get('promoCode'):
+        promo_info = f'''
         <div style="background: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0;">
             <p style="margin: 0;"><strong>✅ 使用優惠碼：</strong>{order_data['promoCode']}</p>
             <p style="margin: 5px 0 0 0; font-size: 12px;">{order_data.get('promoDescription', '')}</p>
         </div>
-        """
-
+        '''
+    
     # 備註
-    note_info = ""
-    if user_info.get("note"):
-        note_info = f"""
+    note_info = ''
+    if user_info.get('note'):
+        note_info = f'''
         <div style="background: #e3f2fd; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0;">
             <p style="margin: 0;"><strong>💬 客戶備註：</strong></p>
             <p style="margin: 5px 0 0 0;">{user_info.get('note')}</p>
         </div>
-        """
-
-    html = f"""
+        '''
+    
+    html = f'''
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"><style>
@@ -1362,15 +1326,14 @@ def generate_internal_order_email_html(order_data):
         </div>
     </body>
     </html>
-    """
+    '''
     return html
-
 
 def generate_internal_stl_email_html(order_data):
     """內部 STL 完成通知 Email HTML"""
-    items_html = ""
-    for idx, item in enumerate(order_data["items"], 1):
-        items_html += f"""
+    items_html = ''
+    for idx, item in enumerate(order_data['items'], 1):
+        items_html += f'''
         <tr>
             <td style="font-weight: bold;">{idx}</td>
             <td style="font-size: 11px;">{item['id']}.stl</td>
@@ -1389,40 +1352,40 @@ def generate_internal_stl_email_html(order_data):
                 • Letter2 BBox: W={item.get('letter2BBox', {}).get('width', 0):.2f} × H={item.get('letter2BBox', {}).get('height', 0):.2f} × D={item.get('letter2BBox', {}).get('depth', 0):.2f} mm
             </td>
         </tr>
-        """
-
-    user_info = order_data["userInfo"]
-
+        '''
+    
+    user_info = order_data['userInfo']
+    
     # 處理收件人資訊（支援新舊格式）
-    buyer_name = user_info.get("buyerName", user_info.get("name", "N/A"))
-    recipient_name = user_info.get("recipientName", user_info.get("name", "N/A"))
-    recipient_phone = user_info.get("recipientPhone", user_info.get("phone", "N/A"))
-    shipping_address = user_info.get("shippingAddress", user_info.get("address", "N/A"))
-    postal_code = user_info.get("postalCode", "")
-
+    buyer_name = user_info.get('buyerName', user_info.get('name', 'N/A'))
+    recipient_name = user_info.get('recipientName', user_info.get('name', 'N/A'))
+    recipient_phone = user_info.get('recipientPhone', user_info.get('phone', 'N/A'))
+    shipping_address = user_info.get('shippingAddress', user_info.get('address', 'N/A'))
+    postal_code = user_info.get('postalCode', '')
+    
     # 發票資訊
-    invoice_type = user_info.get("invoiceType", "personal")
-    invoice_info = ""
-    if invoice_type == "company":
-        invoice_info = f"""
+    invoice_type = user_info.get('invoiceType', 'personal')
+    invoice_info = ''
+    if invoice_type == 'company':
+        invoice_info = f'''
         <p><strong>發票類型：</strong>公司發票（三聯式）</p>
         <p><strong>統一編號：</strong>{user_info.get('companyTaxId', 'N/A')}</p>
         <p><strong>公司抬頭：</strong>{user_info.get('companyName', 'N/A')}</p>
-        """
+        '''
     else:
-        invoice_info = "<p><strong>發票類型：</strong>個人發票（二聯式）</p>"
-
+        invoice_info = '<p><strong>發票類型：</strong>個人發票（二聯式）</p>'
+    
     # 備註
-    note_info = ""
-    if user_info.get("note"):
-        note_info = f"""
+    note_info = ''
+    if user_info.get('note'):
+        note_info = f'''
         <div style="background: #e3f2fd; padding: 10px; border-left: 4px solid #2196F3; margin: 10px 0;">
             <p style="margin: 0;"><strong>💬 客戶備註：</strong></p>
             <p style="margin: 5px 0 0 0;">{user_info.get('note')}</p>
         </div>
-        """
-
-    html = f"""
+        '''
+    
+    html = f'''
     <!DOCTYPE html>
     <html>
     <head><meta charset="UTF-8"><style>
@@ -1496,172 +1459,154 @@ def generate_internal_stl_email_html(order_data):
         </div>
     </body>
     </html>
-    """
+    '''
     return html
-
 
 # ==========================================
 # STL 生成 API
 # ==========================================
 
-
-@app.route("/api/generate-stl", methods=["POST"])
+@app.route('/api/generate-stl', methods=['POST'])
 def generate_stl():
     """生成 STL"""
     try:
         data = request.json
         logger.info(f"🔨 收到 STL 生成請求")
-
+        
         # 只傳送 scad_generator 需要的 9 個參數
         params = {
-            "letter1": data["letter1"],
-            "letter2": data["letter2"],
-            "font1": data["font1"],
-            "font2": data["font2"],
-            "size": data.get("size", 15),
-            "bailRelativeX": data.get("bailRelativeX", 0),
-            "bailRelativeY": data.get("bailRelativeY", 0),
-            "bailRelativeZ": data.get("bailRelativeZ", 0),
-            "bailRotation": data.get("bailRotation", 0),
+            'letter1': data['letter1'],
+            'letter2': data['letter2'],
+            'font1': data['font1'],
+            'font2': data['font2'],
+            'size': data.get('size', 15),
+            'bailRelativeX': data.get('bailRelativeX', 0),
+            'bailRelativeY': data.get('bailRelativeY', 0),
+            'bailRelativeZ': data.get('bailRelativeZ', 0),
+            'bailRotation': data.get('bailRotation', 0)
         }
-
+        
         scad_content = generate_scad_script(**params)
-
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".scad", delete=False
-        ) as scad_file:
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.scad', delete=False) as scad_file:
             scad_file.write(scad_content)
             scad_path = scad_file.name
-
-        stl_path = scad_path.replace(".scad", ".stl")
-
-        cmd = ["openscad", "-o", stl_path, "--export-format", "binstl", scad_path]
-
+        
+        stl_path = scad_path.replace('.scad', '.stl')
+        
+        cmd = ['openscad', '-o', stl_path, '--export-format', 'binstl', scad_path]
+        
         env = os.environ.copy()
-        env["DISPLAY"] = ":99"
-
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=180, env=env
-        )
-
+        env['DISPLAY'] = ':99'
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
+        
         try:
             os.unlink(scad_path)
         except:
             pass
-
+        
         if result.returncode != 0:
             logger.error(f"❌ OpenSCAD 錯誤: {result.stderr}")
-            return jsonify({"success": False, "error": result.stderr}), 500
-
+            return jsonify({'success': False, 'error': result.stderr}), 500
+        
         if not os.path.exists(stl_path):
             logger.error("❌ STL 檔案不存在")
-            return jsonify({"success": False, "error": "STL file not generated"}), 500
-
+            return jsonify({'success': False, 'error': 'STL file not generated'}), 500
+        
         logger.info(f"✅ STL 生成成功: {stl_path}")
-
-        return send_file(
-            stl_path,
-            as_attachment=True,
-            download_name=f"{data['letter1']}_{data['letter2']}.stl",
-        )
-
+        
+        return send_file(stl_path, as_attachment=True, download_name=f"{data['letter1']}_{data['letter2']}.stl")
+        
     except Exception as e:
         logger.error(f"❌ STL 生成錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
 # 綠界金流
 # ==========================================
 
-
 def prepare_custom_fields(order_data):
     """準備 CustomField（訂單備份到綠界）- 使用簡單字符串"""
     try:
-        items = order_data.get("items", [])
-        user_info = order_data.get("userInfo", {})
-
+        items = order_data.get('items', [])
+        user_info = order_data.get('userInfo', {})
+        
         # CustomField1: 基本訂單信息（用 _ 分隔）
-        field1 = "_".join(
-            [
-                str(order_data.get("orderId", "")),
-                str(user_info.get("name", "")),
-                str(user_info.get("email", "")),
-                str(user_info.get("phone", "")),
-                str(order_data.get("total", 0)),
-            ]
-        )[:200]
-
+        field1 = '_'.join([
+            str(order_data.get('orderId', '')),
+            str(user_info.get('name', '')),
+            str(user_info.get('email', '')),
+            str(user_info.get('phone', '')),
+            str(order_data.get('total', 0))
+        ])[:200]
+        
         # CustomField2-4: 商品信息（用 _ 分隔）
         def compress_item(item):
             # 字体名称空格替换成 _
-            font1 = str(item.get("font1", "")).replace(" ", "_")
-            font2 = str(item.get("font2", "")).replace(" ", "_")
-
-            return "_".join(
-                [
-                    str(item.get("letter1", "")),
-                    str(item.get("letter2", "")),
-                    font1,
-                    font2,
-                    str(item.get("size", 15)),
-                    str(item.get("material", "gold18k")),
-                    str(round(item.get("bailRelativeX", 0))),
-                    str(round(item.get("bailRelativeY", 0))),
-                    str(round(item.get("bailRelativeZ", 0))),
-                    str(round(item.get("bailRotation", 0))),
-                ]
-            )[:200]
-
-        field2 = compress_item(items[0]) if len(items) > 0 else ""
-        field3 = compress_item(items[1]) if len(items) > 1 else ""
-        field4 = compress_item(items[2]) if len(items) > 2 else ""
-
+            font1 = str(item.get('font1', '')).replace(' ', '_')
+            font2 = str(item.get('font2', '')).replace(' ', '_')
+            
+            return '_'.join([
+                str(item.get('letter1', '')),
+                str(item.get('letter2', '')),
+                font1,
+                font2,
+                str(item.get('size', 15)),
+                str(item.get('material', 'gold18k')),
+                str(round(item.get('bailRelativeX', 0))),
+                str(round(item.get('bailRelativeY', 0))),
+                str(round(item.get('bailRelativeZ', 0))),
+                str(round(item.get('bailRotation', 0)))
+            ])[:200]
+        
+        field2 = compress_item(items[0]) if len(items) > 0 else ''
+        field3 = compress_item(items[1]) if len(items) > 1 else ''
+        field4 = compress_item(items[2]) if len(items) > 2 else ''
+        
         return {
-            "CustomField1": field1,
-            "CustomField2": field2,
-            "CustomField3": field3,
-            "CustomField4": field4,
+            'CustomField1': field1,
+            'CustomField2': field2,
+            'CustomField3': field3,
+            'CustomField4': field4
         }
     except Exception as e:
         logger.error(f"❌ 準備 CustomField 失敗: {e}")
         return {}
 
-
-@app.route("/api/validate-promo", methods=["POST"])
+@app.route('/api/validate-promo', methods=['POST'])
 def validate_promo():
     """驗證優惠碼（前端即時驗證用）"""
     try:
         data = request.json
-        promo_code = data.get("promoCode", "")
-        total = data.get("total", 0)
-
-        is_valid, discount, promo_info, error_msg = validate_promo_code(
-            promo_code, total
-        )
-
+        promo_code = data.get('promoCode', '')
+        total = data.get('total', 0)
+        
+        is_valid, discount, promo_info, error_msg = validate_promo_code(promo_code, total)
+        
         if is_valid:
-            return jsonify(
-                {
-                    "success": True,
-                    "valid": True,
-                    "discount": discount,
-                    "finalTotal": total - discount,
-                    "description": promo_info.get("description", ""),
-                    "discountType": promo_info.get("type", ""),
-                }
-            )
+            return jsonify({
+                'success': True,
+                'valid': True,
+                'discount': discount,
+                'finalTotal': total - discount,
+                'description': promo_info.get('description', ''),
+                'discountType': promo_info.get('type', '')
+            })
         else:
-            return jsonify({"success": True, "valid": False, "error": error_msg})
-
+            return jsonify({
+                'success': True,
+                'valid': False,
+                'error': error_msg
+            })
+            
     except Exception as e:
         logger.error(f"❌ 優惠碼驗證錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 def generate_check_mac_value(params, hash_key, hash_iv, is_callback=False):
     """產生綠界 CheckMacValue
-
+    
     Args:
         params: 參數字典
         hash_key: HashKey
@@ -1674,186 +1619,177 @@ def generate_check_mac_value(params, hash_key, hash_iv, is_callback=False):
     else:
         # 發送時：過濾空值
         filtered_params = {k: v for k, v in params.items() if v}
-
+    
     sorted_params = sorted(filtered_params.items())
-
+    
     # 1. 參數按字母排序並用 & 連接
-    param_str = "&".join([f"{k}={v}" for k, v in sorted_params])
-
+    param_str = '&'.join([f"{k}={v}" for k, v in sorted_params])
+    
     # 2. 前面加 HashKey，後面加 HashIV
     raw_str = f"HashKey={hash_key}&{param_str}&HashIV={hash_iv}"
-
+    
     # 3. URL encode
     encoded_str = urllib.parse.quote_plus(raw_str)
-
+    
     # 4. 轉小寫
     encoded_str = encoded_str.lower()
-
+    
     # 5. 特殊字符替換
-    encoded_str = encoded_str.replace("%2d", "-")
-    encoded_str = encoded_str.replace("%5f", "_")
-    encoded_str = encoded_str.replace("%2e", ".")
-    encoded_str = encoded_str.replace("%21", "!")
-    encoded_str = encoded_str.replace("%2a", "*")
-    encoded_str = encoded_str.replace("%28", "(")
-    encoded_str = encoded_str.replace("%29", ")")
-
+    encoded_str = encoded_str.replace('%2d', '-')
+    encoded_str = encoded_str.replace('%5f', '_')
+    encoded_str = encoded_str.replace('%2e', '.')
+    encoded_str = encoded_str.replace('%21', '!')
+    encoded_str = encoded_str.replace('%2a', '*')
+    encoded_str = encoded_str.replace('%28', '(')
+    encoded_str = encoded_str.replace('%29', ')')
+    
     if is_callback:
         logger.info(f"🔐 待簽名字串（回調）: {raw_str}")
     else:
         logger.info(f"🔐 待簽名字串（原始）: {raw_str}")
     logger.info(f"🔐 待簽名字串（編碼）: {encoded_str}")
-
+    
     # 6. SHA256 加密
-    check_mac = hashlib.sha256(encoded_str.encode("utf-8")).hexdigest()
-
+    check_mac = hashlib.sha256(encoded_str.encode('utf-8')).hexdigest()
+    
     # 7. 轉大寫
     check_mac = check_mac.upper()
-
+    
     logger.info(f"🔐 CheckMacValue: {check_mac}")
     return check_mac
 
-
-@app.route("/api/checkout", methods=["POST"])
+@app.route('/api/checkout', methods=['POST'])
 def checkout():
     """初始化綠界支付"""
     try:
         data = request.json
         logger.info(f"💳 收到結帳請求: {data.get('orderId')}")
-
-        order_id = data["orderId"]
-        original_total = data["total"]
-        items = data["items"]
-        user_info = data["userInfo"]
-        promo_code = data.get("promoCode", "")
-        return_url = data.get("returnUrl", request.host_url + "payment-success")
-
+        
+        order_id = data['orderId']
+        original_total = data['total']
+        items = data['items']
+        user_info = data['userInfo']
+        promo_code = data.get('promoCode', '')
+        return_url = data.get('returnUrl', request.host_url + 'payment-success')
+        
         # ✅ 後端驗證優惠碼（安全性必須）
-        is_valid, discount, promo_info, error_msg = validate_promo_code(
-            promo_code, original_total
-        )
-
+        is_valid, discount, promo_info, error_msg = validate_promo_code(promo_code, original_total)
+        
         if promo_code and not is_valid:
             logger.warning(f"❌ 優惠碼驗證失敗: {promo_code}, 原因: {error_msg}")
-            return jsonify({"success": False, "error": error_msg or "優惠碼無效"}), 400
-
+            return jsonify({
+                'success': False,
+                'error': error_msg or '優惠碼無效'
+            }), 400
+        
         # 計算最終金額
         final_total = original_total - discount
-
-        logger.info(
-            f"💰 原始金額: NT$ {original_total}, 折扣: NT$ {discount}, 最終金額: NT$ {final_total}"
-        )
-
+        
+        logger.info(f"💰 原始金額: NT$ {original_total}, 折扣: NT$ {discount}, 最終金額: NT$ {final_total}")
+        
         order_data = {
-            "orderId": order_id,
-            "originalTotal": original_total,  # 記錄原始金額
-            "discount": discount,  # 記錄折扣金額
-            "total": final_total,  # 最終付款金額
-            "promoCode": promo_code if is_valid else "",  # 記錄使用的優惠碼
-            "promoDescription": promo_info.get("description", "") if promo_info else "",
-            "items": items,
-            "userInfo": user_info,
-            "status": "pending",
-            "timestamp": datetime.now().isoformat(),
-            "testMode": False,
+            'orderId': order_id,
+            'originalTotal': original_total,  # 記錄原始金額
+            'discount': discount,             # 記錄折扣金額
+            'total': final_total,             # 最終付款金額
+            'promoCode': promo_code if is_valid else '',  # 記錄使用的優惠碼
+            'promoDescription': promo_info.get('description', '') if promo_info else '',
+            'items': items,
+            'userInfo': user_info,
+            'status': 'pending',
+            'timestamp': datetime.now().isoformat(),
+            'testMode': False
         }
         save_order(order_id, order_data)
-
+        
         # 準備 CustomField（訂單備份）
         custom_fields = prepare_custom_fields(order_data)
-
+        
         payment_params = {
-            "MerchantID": ECPAY_CONFIG["MerchantID"],
-            "MerchantTradeNo": order_id,
-            "MerchantTradeDate": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
-            "PaymentType": "aio",
-            "TotalAmount": str(int(final_total)),  # ✅ 使用折扣後的金額
-            "TradeDesc": "DUET",
-            "ItemName": "Pendant",
-            "ReturnURL": request.host_url.rstrip("/") + "/api/payment/callback",
-            "ClientBackURL": request.host_url.rstrip("/") + "/api/payment/success",
-            "ChoosePayment": "Credit",
-            "EncryptType": "1",
+            'MerchantID': ECPAY_CONFIG['MerchantID'],
+            'MerchantTradeNo': order_id,
+            'MerchantTradeDate': datetime.now().strftime('%Y/%m/%d %H:%M:%S'),
+            'PaymentType': 'aio',
+            'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
+            'TradeDesc': 'DUET',
+            'ItemName': 'Pendant',
+            'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
+            'ClientBackURL': request.host_url.rstrip('/') + '/api/payment/success',  # ✅ 付款完成後跳轉
+            'ChoosePayment': 'Credit',
+            'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
         }
-
-        check_mac_value = generate_check_mac_value(
-            payment_params, ECPAY_CONFIG["HashKey"], ECPAY_CONFIG["HashIV"]
-        )
-        payment_params["CheckMacValue"] = check_mac_value
-
-        form_fields = "".join(
-            [
-                f'<input type="hidden" name="{k}" value="{v}">'
-                for k, v in payment_params.items()
-            ]
-        )
+        
+        check_mac_value = generate_check_mac_value(payment_params, 
+                                                   ECPAY_CONFIG['HashKey'], 
+                                                   ECPAY_CONFIG['HashIV'])
+        payment_params['CheckMacValue'] = check_mac_value
+        
+        form_fields = ''.join([f'<input type="hidden" name="{k}" value="{v}">' 
+                              for k, v in payment_params.items()])
         form_html = f'<form id="ecpay-form" method="post" action="{ECPAY_CONFIG["PaymentURL"]}">{form_fields}</form>'
-
+        
         logger.info(f"✅ 綠界表單已生成，包含 CustomField 備份")
-
-        return jsonify(
-            {
-                "success": True,
-                "paymentFormHTML": form_html,
-                "orderId": order_id,
-                "finalTotal": final_total,  # 返回最終金額給前端確認
-                "discount": discount,
-            }
-        )
+        
+        return jsonify({
+            'success': True,
+            'paymentFormHTML': form_html,
+            'orderId': order_id,
+            'finalTotal': final_total,  # 返回最終金額給前端確認
+            'discount': discount
+        })
     except Exception as e:
         logger.error(f"❌ 結帳錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-
-@app.route("/api/payment/callback", methods=["POST"])
+@app.route('/api/payment/callback', methods=['POST'])
 def payment_callback():
     """綠界支付回調"""
     try:
         data = request.form.to_dict()
         logger.info(f"📥 收到綠界回調: {data.get('MerchantTradeNo')}")
-
+        
         # DEBUG: 顯示所有原始參數
         logger.info(f"🔍 DEBUG - 所有參數:")
         for k, v in sorted(data.items()):
             logger.info(f"   {k}={v}")
-
+        
         # ✅ 詳細記錄 CustomField 內容（用於測試）
         logger.info(f"📦 CustomField1: {data.get('CustomField1', '(empty)')}")
         logger.info(f"📦 CustomField2: {data.get('CustomField2', '(empty)')}")
         logger.info(f"📦 CustomField3: {data.get('CustomField3', '(empty)')}")
         logger.info(f"📦 CustomField4: {data.get('CustomField4', '(empty)')}")
-
-        received_check_mac = data.pop("CheckMacValue", "")
-        calculated_check_mac = generate_check_mac_value(
-            data, ECPAY_CONFIG["HashKey"], ECPAY_CONFIG["HashIV"], is_callback=True
-        )  # 回調驗證
-
+        
+        received_check_mac = data.pop('CheckMacValue', '')
+        calculated_check_mac = generate_check_mac_value(data, 
+                                                       ECPAY_CONFIG['HashKey'], 
+                                                       ECPAY_CONFIG['HashIV'],
+                                                       is_callback=True)  # 回調驗證
+        
         logger.info(f"📨 綠界發來的 CheckMacValue: {received_check_mac}")
         logger.info(f"🔢 我們計算的 CheckMacValue: {calculated_check_mac}")
-
+        
         if received_check_mac != calculated_check_mac:
             logger.error(f"❌ CheckMacValue 驗證失敗！")
             logger.error(f"   收到: {received_check_mac}")
             logger.error(f"   計算: {calculated_check_mac}")
-            return "0|CheckMacValue Error"
-
+            return '0|CheckMacValue Error'
+        
         logger.info("✅ CheckMacValue 驗證通過")
-
-        if data.get("RtnCode") == "1":
-            order_id = data["MerchantTradeNo"]
+        
+        if data.get('RtnCode') == '1':
+            order_id = data['MerchantTradeNo']
             logger.info(f"✅ 訂單 {order_id} 付款成功")
             process_order_after_payment(order_id, data)
-            return "1|OK"
+            return '1|OK'
         else:
-            order_id = data.get("MerchantTradeNo")
+            order_id = data.get('MerchantTradeNo')
             if order_id:
-                update_order_status(order_id, "payment_failed", data)
-            return "0|Payment Failed"
+                update_order_status(order_id, 'payment_failed', data)
+            return '0|Payment Failed'
     except Exception as e:
         logger.error(f"❌ 回調處理錯誤: {str(e)}")
-        return "0|Error"
-
+        return '0|Error'
 
 def process_order_after_payment(order_id, payment_data):
     """付款成功後處理訂單（非同步）"""
@@ -1862,92 +1798,91 @@ def process_order_after_payment(order_id, payment_data):
         if not order:
             logger.error(f"❌ 找不到訂單: {order_id}")
             return False
-
+        
         # 1. 立即更新訂單狀態（同步）
-        update_order_status(order_id, "paid", payment_data)
-
+        update_order_status(order_id, 'paid', payment_data)
+        
         # 2. 非同步處理（不阻塞綠界回調）
         def async_tasks():
             try:
                 # 發送顧客確認 Email
                 send_customer_confirmation_email(order)
                 logger.info(f"✅ Email 1 已發送: {order_id}")
-
+                
                 # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
                 # send_internal_order_email(order)  # ← 不再需要
-
+                
                 # 儲存到 Google Sheets
                 save_to_google_sheets(order)
-
+                
                 # 加入 STL 生成隊列
                 add_to_stl_queue(order_id)
-
+                
             except Exception as e:
                 logger.error(f"❌ 非同步任務錯誤: {e}")
-
+        
         # 啟動背景線程
         threading.Thread(target=async_tasks, daemon=True).start()
-
+        
         logger.info(f"✅ 訂單 {order_id} 已加入處理隊列")
         return True
     except Exception as e:
         logger.error(f"❌ 訂單處理錯誤: {str(e)}")
         return False
 
-
-@app.route("/api/test-order", methods=["POST"])
+@app.route('/api/test-order', methods=['POST'])
 def test_order():
     """測試模式：模擬訂單處理（非同步）"""
     try:
         data = request.json
-        order_id = data.get("orderId")
+        order_id = data.get('orderId')
         logger.info(f"🧪 測試模式訂單: {order_id}")
-
+        
         # 立即儲存訂單（同步）
         save_order(order_id, data)
-
+        
         # 更新訂單狀態
-        update_order_status(order_id, "test_processing")
-
+        update_order_status(order_id, 'test_processing')
+        
         # 非同步處理（不阻塞前端）
         def async_tasks():
             try:
                 # 發送顧客確認 Email
                 send_customer_confirmation_email(data)
                 logger.info(f"✅ Email 1 已發送: {order_id}")
-
+                
                 # ✅ 移除第二封內部訂單通知（改用綠界 CustomField 備份）
                 # send_internal_order_email(data)  # ← 不再需要
-
+                
                 # 儲存到 Google Sheets
                 save_to_google_sheets(data)
-
+                
                 # 加入 STL 生成隊列
                 add_to_stl_queue(order_id)
-
+                
             except Exception as e:
                 logger.error(f"❌ 非同步任務錯誤: {e}")
-
+        
         # 啟動背景線程
         threading.Thread(target=async_tasks, daemon=True).start()
-
+        
         # 立即返回（前端不等待）
-        return jsonify(
-            {
-                "success": True,
-                "message": "測試訂單已處理，Email 已發送，STL 正在背景生成",
-            }
-        )
-
+        return jsonify({
+            'success': True,
+            'message': '測試訂單已處理，Email 已發送，STL 正在背景生成'
+        })
+            
     except Exception as e:
         logger.error(f"❌ 測試訂單錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-
-@app.route("/payment-success")
+@app.route('/payment-success')
 def payment_success():
     """支付成功頁面"""
-    return """<!DOCTYPE html><html><head><meta charset="UTF-8"><title>支付成功 - DUET</title>
+    return '''<!DOCTYPE html><html><head><meta charset="UTF-8"><title>支付成功 - DUET</title>
     <style>body{font-family:Arial;display:flex;justify-content:center;align-items:center;height:100vh;
     margin:0;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%)}.container{background:white;
     padding:40px;border-radius:15px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.2)}
@@ -1963,60 +1898,61 @@ def payment_success():
     </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
-    </div></body></html>"""
-
+    </div></body></html>'''
 
 # ==========================================
 # 測試端點
 # ==========================================
 
-
-@app.route("/api/test-custom-fields", methods=["POST"])
+@app.route('/api/test-custom-fields', methods=['POST'])
 def test_custom_fields():
     """測試 CustomField 生成結果"""
     try:
         data = request.json
         logger.info("🧪 測試 CustomField 生成")
-
+        
         custom_fields = prepare_custom_fields(data)
-
+        
         # 解析並美化顯示
         import json as json_lib
-
         result = {}
         for key, value in custom_fields.items():
             try:
                 parsed = json_lib.loads(value) if value else {}
-                result[key] = {"raw": value, "parsed": parsed, "length": len(value)}
+                result[key] = {
+                    'raw': value,
+                    'parsed': parsed,
+                    'length': len(value)
+                }
             except:
                 result[key] = {
-                    "raw": value,
-                    "parsed": None,
-                    "length": len(value) if value else 0,
+                    'raw': value,
+                    'parsed': None,
+                    'length': len(value) if value else 0
                 }
-
+        
         logger.info(f"✅ CustomField1 長度: {result['CustomField1']['length']}/200")
         logger.info(f"✅ CustomField2 長度: {result['CustomField2']['length']}/200")
         logger.info(f"✅ CustomField3 長度: {result['CustomField3']['length']}/200")
         logger.info(f"✅ CustomField4 長度: {result['CustomField4']['length']}/200")
-
-        return jsonify({"success": True, "customFields": result})
-
+        
+        return jsonify({
+            'success': True,
+            'customFields': result
+        })
+        
     except Exception as e:
         logger.error(f"❌ 測試錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==========================================
 # 健康檢查
 # ==========================================
 
-
-@app.route("/health")
+@app.route('/health')
 def health():
     """健康檢查"""
-    return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
-
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
 
 # ==========================================
 # 初始化（Gunicorn 會執行這裡）
@@ -2036,99 +1972,101 @@ start_background_worker()
 # AI 諮詢對話 API（修正版 - 替換到 app.py）
 # ============================================================
 
-
-@app.route("/api/ai-consultant", methods=["POST"])
+@app.route('/api/ai-consultant', methods=['POST'])
 def chat():
     """
     AI 諮詢對話 API
     """
     try:
         data = request.json
-        user_message = data.get("message", "")
-        conversation_history = data.get("history", [])
-
+        user_message = data.get('message', '')
+        conversation_history = data.get('history', [])
+        
         # 構建訊息
-        messages = conversation_history + [{"role": "user", "content": user_message}]
-
+        messages = conversation_history + [
+            {
+                "role": "user",
+                "content": user_message
+            }
+        ]
+        
         # 呼叫 Claude API
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2000,
             system=SYSTEM_PROMPT,
-            messages=messages,
+            messages=messages
         )
-
+        
         ai_response = response.content[0].text
-
+        
         # 判斷是否完成（只有當輸出 JSON 時才算完成）
         is_json_response = False
         result = None
-
+        
         try:
             # 檢查是否是 JSON 回應
             json_str = ai_response.strip()
-
+            
             # 必須以 { 或 ```json 開頭才可能是 JSON
-            if (
-                json_str.startswith("{")
-                or json_str.startswith("```json")
-                or json_str.startswith("```")
-            ):
+            if json_str.startswith('{') or json_str.startswith('```json') or json_str.startswith('```'):
                 # 清理 Markdown 標記
-                if json_str.startswith("```json"):
+                if json_str.startswith('```json'):
                     json_str = json_str[7:]
-                if json_str.startswith("```"):
+                if json_str.startswith('```'):
                     json_str = json_str[3:]
-                if json_str.endswith("```"):
+                if json_str.endswith('```'):
                     json_str = json_str[:-3]
                 json_str = json_str.strip()
-
+                
                 # 嘗試解析
                 parsed = json.loads(json_str)
-
+                
                 # 檢查是否包含推薦欄位（這才是真正的完成標誌）
-                if "recommendations" in parsed and "letters" in parsed:
+                if 'recommendations' in parsed and 'letters' in parsed:
                     is_json_response = True
                     result = parsed
-
+                    
                     # 確保有 conversationSummary
-                    if "conversationSummary" not in result:
-                        result["conversationSummary"] = {}
-
-                    logger.info("✅ 檢測到完整 JSON 推薦，對話完成")
+                    if 'conversationSummary' not in result:
+                        result['conversationSummary'] = {}
+                    
+                    logger.info('✅ 檢測到完整 JSON 推薦，對話完成')
                 else:
-                    logger.info("⚠️ JSON 但缺少推薦欄位，繼續對話")
+                    logger.info('⚠️ JSON 但缺少推薦欄位，繼續對話')
                     is_json_response = False
-
+                    
         except (json.JSONDecodeError, ValueError) as e:
             # 不是 JSON 或解析失敗，繼續對話
-            logger.info(f"📝 對話進行中（非 JSON 回應）")
+            logger.info(f'📝 對話進行中（非 JSON 回應）')
             is_json_response = False
-
+        
         # 回傳結果
         if is_json_response and result:
             # 完成推薦
-            return jsonify({"completed": True, "message": ai_response, **result})
+            return jsonify({
+                'completed': True,
+                'message': ai_response,
+                **result
+            })
         else:
             # 繼續對話
-            return jsonify({"completed": False, "message": ai_response})
-
+            return jsonify({
+                'completed': False,
+                'message': ai_response
+            })
+        
     except Exception as e:
-        logger.error(f"❌ Chat API 錯誤: {str(e)}")
-        logger.error(f"錯誤詳情: {traceback.format_exc()}")
-        return (
-            jsonify(
-                {
-                    "completed": False,
-                    "message": "抱歉，發生了一些問題。請重新整理頁面再試一次。",
-                    "error": str(e),
-                }
-            ),
-            500,
-        )
+        logger.error(f'❌ Chat API 錯誤: {str(e)}')
+        logger.error(f'錯誤詳情: {traceback.format_exc()}')
+        return jsonify({
+            'completed': False,
+            'message': '抱歉，發生了一些問題。請重新整理頁面再試一次。',
+            'error': str(e)
+        }), 500
 
 
-@app.route("/api/generate-design-concept", methods=["POST"])
+@app.route('/api/generate-design-concept', methods=['POST'])
 def api_generate_design_concept():
     """
     生成設計理念端點
@@ -2136,47 +2074,55 @@ def api_generate_design_concept():
     """
     try:
         data = request.json
-
+        
         # 獲取必要參數
-        conversation = data.get("conversation", [])
-        selected_fonts = data.get("selectedFonts", {})
-        items = data.get("items", [])
-
+        conversation = data.get('conversation', [])
+        selected_fonts = data.get('selectedFonts', {})
+        items = data.get('items', [])
+        
         if not conversation or not selected_fonts or not items:
-            return jsonify({"success": False, "error": "缺少必要參數"}), 400
-
+            return jsonify({
+                'success': False,
+                'error': '缺少必要參數'
+            }), 400
+        
         # 從第一個 item 獲取字母
         first_item = items[0]
         letters = {
-            "letter1": first_item.get("letter1", ""),
-            "letter2": first_item.get("letter2", ""),
+            'letter1': first_item.get('letter1', ''),
+            'letter2': first_item.get('letter2', '')
         }
-
+        
         # 使用實際選定的字體（不是推薦的字體）
         final_fonts = {
-            "font1": first_item.get("font1", selected_fonts.get("font1", "")),
-            "font2": first_item.get("font2", selected_fonts.get("font2", "")),
+            'font1': first_item.get('font1', selected_fonts.get('font1', '')),
+            'font2': first_item.get('font2', selected_fonts.get('font2', ''))
         }
-
+        
         # 生成設計理念
         result = generate_design_concept(conversation, final_fonts, letters)
-
-        if result["success"]:
-            return jsonify(
-                {"success": True, "concept": result["concept"], "items": items}
-            )
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'concept': result['concept'],
+                'items': items
+            })
         else:
-            return (
-                jsonify({"success": False, "error": result.get("error", "生成失敗")}),
-                500,
-            )
-
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '生成失敗')
+            }), 500
+            
     except Exception as e:
         print(f"Design Concept API Error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
-@app.route("/api/order/<order_id>", methods=["GET"])
+@app.route('/api/order/<order_id>', methods=['GET'])
 def get_order(order_id):
     """
     獲取訂單詳情
@@ -2185,85 +2131,101 @@ def get_order(order_id):
     try:
         # 從 Google Sheets 查詢訂單
         gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG["orders"]["spreadsheet_id"]).sheet1
-
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
         # 查找訂單
         orders = sheet.get_all_records()
         order = None
-
+        
         for row in orders:
-            if row.get("訂單編號") == order_id:
+            if row.get('訂單編號') == order_id:
                 order = row
                 break
-
+        
         if not order:
-            return jsonify({"success": False, "error": "訂單不存在"}), 404
-
+            return jsonify({
+                'success': False,
+                'error': '訂單不存在'
+            }), 404
+        
         # 解析訂單項目（假設存儲為 JSON）
-        items = json.loads(order.get("items", "[]"))
-
+        items = json.loads(order.get('items', '[]'))
+        
         # 獲取 AI 諮詢數據（如果有）
-        ai_data_str = order.get("ai_consultation", "")
+        ai_data_str = order.get('ai_consultation', '')
         ai_data = json.loads(ai_data_str) if ai_data_str else None
-
-        return jsonify(
-            {
-                "success": True,
-                "order_id": order_id,
-                "customer": {
-                    "name": order.get("姓名", ""),
-                    "email": order.get("Email", ""),
-                },
-                "items": items,
-                "ai_data": ai_data,
-                "status": order.get("狀態", ""),
-                "needs_design_concept": order.get("needs_design_concept", False),
-            }
-        )
-
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'customer': {
+                'name': order.get('姓名', ''),
+                'email': order.get('Email', '')
+            },
+            'items': items,
+            'ai_data': ai_data,
+            'status': order.get('狀態', ''),
+            'needs_design_concept': order.get('needs_design_concept', False)
+        })
+        
     except Exception as e:
         print(f"Get Order Error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
-@app.route("/api/save-design-concepts", methods=["POST"])
+@app.route('/api/save-design-concepts', methods=['POST'])
 def save_design_concepts():
     """
     保存設計理念和卡片選擇
     """
     try:
         data = request.json
-        order_id = data.get("order_id")
-        concepts = data.get("concepts", [])
-
+        order_id = data.get('order_id')
+        concepts = data.get('concepts', [])
+        
         if not order_id or not concepts:
-            return jsonify({"success": False, "error": "缺少必要參數"}), 400
-
+            return jsonify({
+                'success': False,
+                'error': '缺少必要參數'
+            }), 400
+        
         # 更新訂單記錄
         gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG["orders"]["spreadsheet_id"]).sheet1
-
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
         # 找到訂單行
         cell = sheet.find(order_id)
         if cell:
             row_index = cell.row
-
+            
             # 更新設計理念數據
             concepts_json = json.dumps(concepts, ensure_ascii=False)
-
+            
             # 假設有 "design_concepts" 欄位
             sheet.update_cell(row_index, 15, concepts_json)  # 調整欄位索引
-
+            
             # 發送確認郵件（包含設計理念）
             send_order_confirmation_with_concepts(order_id, concepts)
-
-            return jsonify({"success": True, "message": "設計理念已保存"})
+            
+            return jsonify({
+                'success': True,
+                'message': '設計理念已保存'
+            })
         else:
-            return jsonify({"success": False, "error": "找不到訂單"}), 404
-
+            return jsonify({
+                'success': False,
+                'error': '找不到訂單'
+            }), 404
+            
     except Exception as e:
         print(f"Save Design Concepts Error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 def send_order_confirmation_with_concepts(order_id, concepts):
@@ -2273,20 +2235,20 @@ def send_order_confirmation_with_concepts(order_id, concepts):
     try:
         # 獲取訂單詳情
         gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG["orders"]["spreadsheet_id"]).sheet1
-
+        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        
         orders = sheet.get_all_records()
         order = None
-
+        
         for row in orders:
-            if row.get("訂單編號") == order_id:
+            if row.get('訂單編號') == order_id:
                 order = row
                 break
-
+        
         if not order:
             print(f"Order {order_id} not found")
             return
-
+        
         # 構建郵件內容
         concepts_html = ""
         for concept in concepts:
@@ -2297,7 +2259,7 @@ def send_order_confirmation_with_concepts(order_id, concepts):
                 <p style="color: #888; font-size: 14px;">卡片版型：{concept['card_template']}</p>
             </div>
             """
-
+        
         email_html = f"""
         <html>
         <body style="font-family: 'Microsoft JhengHei', sans-serif; padding: 20px;">
@@ -2317,23 +2279,20 @@ def send_order_confirmation_with_concepts(order_id, concepts):
         </body>
         </html>
         """
-
+        
         # 使用 Resend 發送
         import resend
-
-        resend.api_key = os.getenv("RESEND_API_KEY")
-
-        resend.Emails.send(
-            {
-                "from": "service@brendonchen.com",
-                "to": [order.get("Email", "")],
-                "subject": f"DUET 訂單確認 #{order_id}",
-                "html": email_html,
-            }
-        )
-
+        resend.api_key = os.getenv('RESEND_API_KEY')
+        
+        resend.Emails.send({
+            "from": "service@brendonchen.com",
+            "to": [order.get('Email', '')],
+            "subject": f"DUET 訂單確認 #{order_id}",
+            "html": email_html
+        })
+        
         print(f"Confirmation email sent for order {order_id}")
-
+        
     except Exception as e:
         print(f"Send Email Error: {e}")
 
@@ -2350,8 +2309,7 @@ def send_order_confirmation_with_concepts(order_id, concepts):
 # 設計理念生成 API（新增到 app.py）
 # ============================================================
 
-
-@app.route("/api/design-story", methods=["POST"])
+@app.route('/api/design-story', methods=['POST'])
 def generate_design_story():
     """
     結帳後生成設計理念
@@ -2369,11 +2327,11 @@ def generate_design_story():
     """
     try:
         data = request.json
-
-        conversation_summary = data.get("conversationSummary", {})
-        selected_fonts = data.get("selectedFonts", {})
-        font_reason = data.get("fontReason", "")
-
+        
+        conversation_summary = data.get('conversationSummary', {})
+        selected_fonts = data.get('selectedFonts', {})
+        font_reason = data.get('fontReason', '')
+        
         # 構建訊息（使用第六階段 System Prompt）
         messages = [
             {
@@ -2390,44 +2348,51 @@ def generate_design_story():
 【用戶說明】
 {font_reason}
 
-請生成設計理念。""",
+請生成設計理念。"""
             }
         ]
-
+        
         # 呼叫 Claude API
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1000,
             system=SYSTEM_PROMPT,  # 會使用第六階段邏輯
-            messages=messages,
+            messages=messages
         )
-
+        
         ai_response = response.content[0].text
-
+        
         # 解析 JSON
         json_str = ai_response.strip()
-        if json_str.startswith("```json"):
+        if json_str.startswith('```json'):
             json_str = json_str[7:]
-        if json_str.startswith("```"):
+        if json_str.startswith('```'):
             json_str = json_str[3:]
-        if json_str.endswith("```"):
+        if json_str.endswith('```'):
             json_str = json_str[:-3]
         json_str = json_str.strip()
-
+        
         result = json.loads(json_str)
-
-        return jsonify({"success": True, "designStory": result.get("designStory", "")})
-
+        
+        return jsonify({
+            'success': True,
+            'designStory': result.get('designStory', '')
+        })
+        
     except json.JSONDecodeError as e:
-        logger.error(f"❌ JSON 解析失敗: {str(e)}")
-        logger.error(f"原始回應: {ai_response}")
-        return jsonify({"success": False, "error": f"JSON 解析失敗: {str(e)}"}), 500
-
+        logger.error(f'❌ JSON 解析失敗: {str(e)}')
+        logger.error(f'原始回應: {ai_response}')
+        return jsonify({
+            'success': False,
+            'error': f'JSON 解析失敗: {str(e)}'
+        }), 500
+        
     except Exception as e:
-        logger.error(f"❌ 設計理念生成錯誤: {str(e)}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+        logger.error(f'❌ 設計理念生成錯誤: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
