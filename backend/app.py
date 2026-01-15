@@ -1714,7 +1714,7 @@ def checkout():
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            # 'ClientBackURL': return_url, #
+            'ClientBackURL': request.host_url.rstrip('/') + '/api/payment/success'
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
