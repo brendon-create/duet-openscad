@@ -1008,7 +1008,7 @@ def send_internal_stl_email(order_data, stl_files):
                 with open(stl_path, 'rb') as f:
                     content = base64.b64encode(f.read()).decode()
                     attachments.append({
-                        "filename": filename,
+                        "name": filename,
                         "content": content
                     })
                 logger.info(f"📎 附加: {filename}")
@@ -1017,12 +1017,12 @@ def send_internal_stl_email(order_data, stl_files):
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
             to=[{"email": INTERNAL_EMAIL}],
             subject=f"STL 已生成 - 訂單 #{order_id}",
-            html_content=html
+            html_content=html,
+            attachment=attachments if attachments else None
         )
         api_instance.send_transac_email(send_smtp_email)
         
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 內部 STL Email 已發送: {email}")
+        logger.info(f"✅ 內部 STL Email 已發送")
         return True
         
     except Exception as e:
@@ -1714,7 +1714,7 @@ def checkout():
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'ClientBackURL': request.host_url.rstrip('/') + '/api/payment/success',  # ✅ 付款完成後跳轉
+            'ClientBackURL': request.host_url.rstrip('/') + '/payment-success',  # ✅ 付款完成後跳轉
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
