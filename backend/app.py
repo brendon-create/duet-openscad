@@ -1754,7 +1754,7 @@ def checkout():
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'ClientBackURL': request.host_url.rstrip('/') + '/payment-success',  # ✅ 付款完成後跳轉
+            'ClientBackURL': 'https://brendonchen.com/duet?payment=success',  # ✅ 付款完成後直接跳轉到前端
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
