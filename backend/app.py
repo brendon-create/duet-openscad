@@ -433,8 +433,8 @@ ECPAY_CONFIG = {
 
 # Resend Email 配置
 RESEND_API_KEY = 're_Vy8zWUJ2_KhUfFBXD5qiPEVPPsLAghgGr'
-SENDER_EMAIL = 'service@brendonchen.com'
-SENDER_NAME = 'DUET 客製珠寶'
+SENDER_EMAIL = 'service@mail.brendonchen.com'
+SENDER_NAME = 'DUET 客製珠寶 (請勿回覆)'
 INTERNAL_EMAIL = 'brendon@brendonchen.com'
 
 # 設定 Brevo API Key
@@ -961,35 +961,48 @@ def send_customer_confirmation_email(order_data):
             subject=f"DUET 訂單確認 #{order_id}",
             html_content=html
         )
-        api_instance.send_transac_email(send_smtp_email)
-        logger.info(f"✅ 顧客確認 Email 已發送")
+        
+        response = api_instance.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 顧客確認 Email 已發送: {response}")
         return True
         
+    except ApiException as e:
+        logger.error(f"❌ Brevo API 錯誤: {e.status} - {e.reason}")
+        logger.error(f"❌ 詳細訊息: {e.body}")
+        return False
     except Exception as e:
         logger.error(f"❌ 顧客 Email 發送失敗: {str(e)}")
+        import traceback
+        logger.error(f"❌ 錯誤堆疊: {traceback.format_exc()}")
         return False
 
 def send_internal_order_email(order_data):
     """Email 2: 給內部的訂單通知（無 STL）"""
     try:
+        order_id = order_data['orderId']
         logger.info(f"📧 發送內部訂單通知")
         
         html = generate_internal_order_email_html(order_data)
         
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
-            to=[{"email": customer_email}],
-            subject=f"DUET 訂單確認 #{order_id}",
-            html_content=email_html
+            to=[{"email": INTERNAL_EMAIL}],
+            subject=f"新訂單通知 - 訂單 #{order_id}",
+            html_content=html
         )
-        api_instance.send_transac_email(send_smtp_email)
         
-        email = resend.Emails.send(params)
-        logger.info(f"✅ 內部訂單 Email 已發送: {email}")
+        response = api_instance.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 內部訂單 Email 已發送: {response}")
         return True
         
+    except ApiException as e:
+        logger.error(f"❌ Brevo API 錯誤: {e.status} - {e.reason}")
+        logger.error(f"❌ 詳細訊息: {e.body}")
+        return False
     except Exception as e:
         logger.error(f"❌ 內部訂單 Email 發送失敗: {str(e)}")
+        import traceback
+        logger.error(f"❌ 錯誤堆疊: {traceback.format_exc()}")
         return False
 
 def send_internal_stl_email(order_data, stl_files):
@@ -1000,33 +1013,54 @@ def send_internal_stl_email(order_data, stl_files):
         
         html = generate_internal_stl_email_html(order_data)
         
-        # 準備附件
-        attachments = []
-        for stl_path in stl_files:
-            if os.path.exists(stl_path):
-                filename = os.path.basename(stl_path)
-                with open(stl_path, 'rb') as f:
-                    content = base64.b64encode(f.read()).decode()
-                    attachments.append({
-                        "name": filename,
-                        "content": content
-                    })
-                logger.info(f"📎 附加: {filename}")
+        # 準備附件 - 將所有 STL 壓縮成一個 ZIP
+        import zipfile
+        import io
         
+        if not stl_files:
+            logger.warning("⚠️ 沒有 STL 檔案可以發送")
+            return False
+        
+        # 創建 ZIP 檔案（在記憶體中）
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for stl_path in stl_files:
+                if os.path.exists(stl_path):
+                    filename = os.path.basename(stl_path)
+                    zip_file.write(stl_path, filename)
+                    logger.info(f"📎 已壓縮: {filename}")
+        
+        # 轉換為 Base64
+        zip_buffer.seek(0)
+        zip_content = base64.b64encode(zip_buffer.read()).decode()
+        zip_filename = f"STL_Files_{order_id}.zip"
+        
+        logger.info(f"📦 ZIP 檔案大小: {len(zip_content)} bytes (Base64)")
+        
+        # 發送 Email
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
             sender={"name": SENDER_NAME, "email": SENDER_EMAIL},
             to=[{"email": INTERNAL_EMAIL}],
             subject=f"STL 已生成 - 訂單 #{order_id}",
             html_content=html,
-            attachment=attachments if attachments else None
+            attachment=[{
+                "name": zip_filename,
+                "content": zip_content
+            }]
         )
-        api_instance.send_transac_email(send_smtp_email)
         
-        logger.info(f"✅ 內部 STL Email 已發送")
+        response = api_instance.send_transac_email(send_smtp_email)
+        logger.info(f"✅ 內部 STL Email 已發送: {response}")
         return True
         
+    except ApiException as e:
+        logger.error(f"❌ Brevo API 錯誤: {e.status} - {e.reason}")
+        logger.error(f"❌ 詳細訊息: {e.body}")
+        return False
     except Exception as e:
         logger.error(f"❌ 內部 STL Email 發送失敗: {str(e)}")
+        import traceback
+        logger.error(f"❌ 錯誤堆疊: {traceback.format_exc()}")
         return False
 
 # ==========================================
@@ -1157,7 +1191,13 @@ def generate_customer_email_html(order_data):
             </div>
             
             <p>我們將盡快為您製作產品，製作完成後會再次通知您。</p>
-            <p>如有任何問題，請隨時與我們聯繫。</p>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                <p style="margin: 0 0 10px 0; color: #856404;"><strong>⚠️ 重要提醒</strong></p>
+                <p style="margin: 0 0 5px 0; color: #856404;">此為系統自動發送的確認信，請勿直接回覆此郵件。</p>
+                <p style="margin: 0; color: #856404;">如有任何問題，請聯繫客服信箱：<a href="mailto:service@brendonchen.com" style="color: #667eea; text-decoration: none; font-weight: bold;">service@brendonchen.com</a></p>
+            </div>
+            
             <p>祝您有美好的一天！</p>
             <p><strong>DUET 團隊 敬上</strong></p>
         </div>
@@ -1890,14 +1930,28 @@ def payment_success():
     p{color:#666;line-height:1.6}.btn{display:inline-block;margin-top:20px;padding:12px 30px;
     background:#667eea;color:white;text-decoration:none;border-radius:5px}</style>
     <script>
-    setTimeout(() => {
+    // ✅ 立即執行（不等待 DOM）
+    console.log('💳 payment-success 頁面已載入');
+    console.log('💾 設置 localStorage 標記');
+    
+    try {
         localStorage.setItem('duet_payment_success', 'true');
+        console.log('✅ localStorage 設置成功:', localStorage.getItem('duet_payment_success'));
+    } catch (e) {
+        console.error('❌ localStorage 設置失敗:', e);
+    }
+    
+    // ✅ 3 秒後跳轉
+    console.log('⏰ 將在 3 秒後跳轉...');
+    setTimeout(() => {
+        console.log('🔄 開始跳轉到 DUET 頁面');
         window.location.href = 'https://brendonchen.com/duet';
     }, 3000);
     </script>
     </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
+    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://brendonchen.com/duet" style="color:#667eea;">點擊這裡</a></p>
     </div></body></html>'''
 
 # ==========================================
