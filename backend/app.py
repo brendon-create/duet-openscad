@@ -1748,6 +1748,9 @@ def checkout():
         # 取得前端 URL（從環境變數或使用預設值）
         frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
         
+        # ✅ 構建 OrderResultURL，對 query string 進行編碼以避免 & 符號問題
+        order_result_url = f"{frontend_url}?payment_status=success%26order_id={order_id}"
+        
         payment_params = {
             'MerchantID': ECPAY_CONFIG['MerchantID'],
             'MerchantTradeNo': order_id,
@@ -1757,7 +1760,7 @@ def checkout():
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
             'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'OrderResultURL': f"{frontend_url}?payment_status=success&order_id={order_id}",  # ✅ Client端自動跳轉
+            'OrderResultURL': order_result_url,  # ✅ Client端自動跳轉（& 已編碼為 %26）
             'ClientBackURL': frontend_url,  # ✅ 手動返回按鈕
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
