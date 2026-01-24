@@ -1882,15 +1882,15 @@ def payment_result():
             logger.info(f"✅ OrderResultURL 付款成功，準備導向前端")
             frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
             
-            # 使用 HTML + JavaScript 導向前端（帶參數）
+            # 使用 Fragment (#) 而非 Query String (?) - Wix 會過濾 query parameters
             return f'''
                 <html>
                 <head><meta charset="utf-8"></head>
                 <body>
                     <h2>付款成功！正在導向...</h2>
                     <script>
-                        // 立即導向前端並帶訂單參數
-                        window.location.href = "{frontend_url}?payment_success=true&order={order_id}";
+                        // 使用 # (fragment) 避免 Wix 過濾參數
+                        window.location.href = "{frontend_url}#payment_success=true&order={order_id}";
                     </script>
                 </body>
                 </html>
@@ -1904,7 +1904,7 @@ def payment_result():
                 <body>
                     <h2>付款失敗</h2>
                     <script>
-                        window.location.href = "{frontend_url}?payment_failed=true&order={order_id}";
+                        window.location.href = "{frontend_url}#payment_failed=true&order={order_id}";
                     </script>
                 </body>
                 </html>
