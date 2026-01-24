@@ -705,6 +705,10 @@ def save_to_google_sheets(order_data):
         final_total = order_data.get('total', 0)
         promo_code = order_data.get('promoCode', '')
         
+        # AI 諮詢資料（轉為 JSON 字串）
+        ai_consultation = order_data.get('aiConsultation')
+        ai_consultation_str = json.dumps(ai_consultation, ensure_ascii=False) if ai_consultation else ''
+        
         row = [
             order_data.get('orderId', ''),                              # A: 訂單編號
             order_data.get('userInfo', {}).get('name', ''),            # B: 客戶姓名
@@ -717,13 +721,14 @@ def save_to_google_sheets(order_data):
             promo_code,                                                 # I: 優惠碼
             final_total,                                                # J: 結帳金額
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
-            order_data.get('status', 'pending')                         # L: 狀態
+            order_data.get('status', 'pending'),                        # L: 狀態
+            ai_consultation_str                                         # M: AI 諮詢資料（新增）
         ]
         
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range='A:L',  # 不指定分頁名稱
+            range='A:M',  # 擴展到 M 欄
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
@@ -1710,6 +1715,7 @@ def checkout():
         items = data['items']
         user_info = data['userInfo']
         promo_code = data.get('promoCode', '')
+        ai_consultation = data.get('aiConsultation', None)  # ✅ 新增：接收 AI 諮詢資料
         return_url = data.get('returnUrl', request.host_url + 'payment-success')
         
         # ✅ 後端驗證優惠碼（安全性必須）
@@ -1736,6 +1742,7 @@ def checkout():
             'promoDescription': promo_info.get('description', '') if promo_info else '',
             'items': items,
             'userInfo': user_info,
+            'aiConsultation': ai_consultation,  # ✅ 新增：儲存 AI 諮詢資料
             'status': 'pending',
             'timestamp': datetime.now().isoformat(),
             'testMode': False
@@ -2315,11 +2322,19 @@ def get_order(order_id):
                 'error': '訂單不存在'
             }), 404
         
-        # 解析訂單項目（假設存儲為 JSON）
-        items = json.loads(order.get('items', '[]'))
+        # 解析訂單項目（從多個欄位合併）
+        items = []
+        # Google Sheets 的商品存在 E, F, G 欄（商品1, 商品2, 商品3）
+        for i in range(1, 4):  # 最多 3 個商品
+            item_str = order.get(f'商品{i}', '')
+            if item_str:
+                try:
+                    items.append(json.loads(item_str))
+                except:
+                    pass
         
-        # 獲取 AI 諮詢數據（如果有）
-        ai_data_str = order.get('ai_consultation', '')
+        # 獲取 AI 諮詢數據（M 欄）
+        ai_data_str = order.get('AI諮詢資料', '')  # 使用中文欄位名
         ai_data = json.loads(ai_data_str) if ai_data_str else None
         
         return jsonify({
