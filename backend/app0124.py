@@ -1745,6 +1745,11 @@ def checkout():
         # 準備 CustomField（訂單備份）
         custom_fields = prepare_custom_fields(order_data)
         
+        # 取得前端 URL（從環境變數或使用預設值）
+        frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        # 取得後端 URL
+        backend_url = request.host_url.rstrip('/')
+        
         payment_params = {
             'MerchantID': ECPAY_CONFIG['MerchantID'],
             'MerchantTradeNo': order_id,
@@ -1753,8 +1758,9 @@ def checkout():
             'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
-            'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'ClientBackURL': request.host_url.rstrip('/') + '/payment-success',  # ✅ 付款完成後跳轉
+            'ReturnURL': backend_url + '/api/payment/callback',
+            'OrderResultURL': backend_url + f'/api/payment/result?order={order_id}',  # ✅ 指向後端處理
+            'ClientBackURL': frontend_url,  # ✅ 手動返回按鈕
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
@@ -1830,6 +1836,87 @@ def payment_callback():
     except Exception as e:
         logger.error(f"❌ 回調處理錯誤: {str(e)}")
         return '0|Error'
+
+@app.route('/api/payment/result', methods=['POST'])
+def payment_result():
+    """處理 OrderResultURL 回調（綠界付款完成後的前端跳轉）"""
+    try:
+        # 接收綠界的 POST 資料
+        data = request.form.to_dict()
+        order_id = request.args.get('order')  # 從 URL 參數取得 order_id
+        
+        logger.info(f"🎯 收到 OrderResultURL 回調: {order_id}")
+        logger.info(f"📦 付款結果資料: RtnCode={data.get('RtnCode')}, RtnMsg={data.get('RtnMsg')}")
+        
+        # 驗證 CheckMacValue
+        received_check_mac = data.pop('CheckMacValue', '')
+        calculated_check_mac = generate_check_mac_value(data, 
+                                                       ECPAY_CONFIG['HashKey'], 
+                                                       ECPAY_CONFIG['HashIV'],
+                                                       is_callback=True)
+        
+        if received_check_mac != calculated_check_mac:
+            logger.error(f"❌ OrderResultURL CheckMacValue 驗證失敗")
+            # 即使驗證失敗，仍然導向前端（讓前端自己查詢訂單狀態）
+            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <script>
+                        window.location.href = "{frontend_url}?order={order_id}&verify_failed=true";
+                    </script>
+                </body>
+                </html>
+            '''
+        
+        # 驗證成功，根據付款狀態導向前端
+        if data.get('RtnCode') == '1':
+            logger.info(f"✅ OrderResultURL 付款成功，準備導向前端")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            
+            # 使用 HTML + JavaScript 導向前端（帶參數）
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款成功！正在導向...</h2>
+                    <script>
+                        // 立即導向前端並帶訂單參數
+                        window.location.href = "{frontend_url}?payment_success=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+        else:
+            logger.warning(f"⚠️ OrderResultURL 付款失敗: {data.get('RtnMsg')}")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款失敗</h2>
+                    <script>
+                        window.location.href = "{frontend_url}?payment_failed=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+            
+    except Exception as e:
+        logger.error(f"❌ OrderResultURL 處理錯誤: {str(e)}")
+        # 錯誤時也導向前端
+        frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        return f'''
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body>
+                <script>
+                    window.location.href = "{frontend_url}?payment_error=true";
+                </script>
+            </body>
+            </html>
+        '''
 
 def process_order_after_payment(order_id, payment_data):
     """付款成功後處理訂單（非同步）"""
@@ -2175,6 +2262,32 @@ def api_generate_design_concept():
             'error': str(e)
         }), 500
 
+
+@app.route('/api/order/status/<order_id>', methods=['GET'])
+def get_order_status(order_id):
+    """
+    快速查詢訂單付款狀態（用於前端付款檢測）
+    """
+    try:
+        order = load_order(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'error': '訂單不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'status': order.get('status', 'unknown'),
+            'paid': order.get('status') == 'paid'
+        })
+    except Exception as e:
+        logger.error(f"❌ 查詢訂單狀態錯誤: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/order/<order_id>', methods=['GET'])
 def get_order(order_id):
