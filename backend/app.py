@@ -2515,23 +2515,72 @@ def generate_design_story():
         selected_fonts = data.get('selectedFonts', {})
         font_reason = data.get('fontReason', '')
         
-        # 構建訊息（使用第六階段 System Prompt）
+        # DEBUG: 檢查接收到的資料
+        logger.info(f"🔍 設計理念生成請求:")
+        logger.info(f"  - conversationSummary 類型: {type(conversation_summary)}")
+        logger.info(f"  - conversationSummary 內容: {json.dumps(conversation_summary, ensure_ascii=False)[:200]}")
+        logger.info(f"  - fontReason: {font_reason[:100]}")
+        
+        # 提取關鍵資訊
+        conversation_history = conversation_summary.get('conversationHistory', [])
+        ai_summary = conversation_summary.get('summary', '')
+        full_recommendations = conversation_summary.get('fullRecommendations', {})
+        
+        # 將對話歷史轉換為易讀格式
+        conversation_text = ""
+        for msg in conversation_history:
+            role = "AI 顧問" if msg.get('role') == 'assistant' else "顧客"
+            content = msg.get('content', '')
+            conversation_text += f"{role}：{content}\n\n"
+        
+        # 獲取字體推薦理由
+        letter1_recommendations = full_recommendations.get('letter1', [])
+        letter2_recommendations = full_recommendations.get('letter2', [])
+        
+        # 找出用戶選擇的字體及其推薦理由
+        selected_font1_reason = ""
+        selected_font2_reason = ""
+        
+        for rec in letter1_recommendations:
+            if rec.get('font') == selected_fonts.get('font1'):
+                selected_font1_reason = rec.get('reason', '')
+                break
+        
+        for rec in letter2_recommendations:
+            if rec.get('font') == selected_fonts.get('font2'):
+                selected_font2_reason = rec.get('reason', '')
+                break
+        
+        # 構建清晰的提示詞
         messages = [
             {
                 "role": "user",
-                "content": f"""根據以下資訊生成設計理念：
+                "content": f"""請根據以下資訊，生成溫暖、有故事感的設計理念（2-3段，每段30-50字）：
 
-【之前的對話摘要】
-{json.dumps(conversation_summary, ensure_ascii=False, indent=2)}
+=== 完整的諮詢對話 ===
+{conversation_text}
 
-【最終選擇的字體】
-字母 "{selected_fonts.get('letter1', '')}": {selected_fonts.get('font1', '')}
-字母 "{selected_fonts.get('letter2', '')}": {selected_fonts.get('font2', '')}
+=== AI 顧問的總結 ===
+{ai_summary}
 
-【用戶說明】
+=== 選擇的字母與字體 ===
+• 字母 {selected_fonts.get('letter1', '')}: {selected_fonts.get('font1', '')}
+  推薦理由：{selected_font1_reason}
+
+• 字母 {selected_fonts.get('letter2', '')}: {selected_fonts.get('font2', '')}
+  推薦理由：{selected_font2_reason}
+
+=== 顧客對字體選擇的說明 ===
 {font_reason}
 
-請生成設計理念。"""
+=== 任務 ===
+請整合上述所有內容，特別是：
+1. 對話中提到的故事、回憶、轉折點
+2. 兩人的關係特質與共通點
+3. 字體選擇的情感意義
+4. 配戴時想傳達的情感
+
+生成能打動人心的設計理念（2-3段）。直接輸出文字，不要包含任何格式標記。"""
             }
         ]
         
@@ -2543,23 +2592,11 @@ def generate_design_story():
             messages=messages
         )
         
-        ai_response = response.content[0].text
-        
-        # 解析 JSON
-        json_str = ai_response.strip()
-        if json_str.startswith('```json'):
-            json_str = json_str[7:]
-        if json_str.startswith('```'):
-            json_str = json_str[3:]
-        if json_str.endswith('```'):
-            json_str = json_str[:-3]
-        json_str = json_str.strip()
-        
-        result = json.loads(json_str)
+        design_story = response.content[0].text.strip()
         
         return jsonify({
             'success': True,
-            'designStory': result.get('designStory', '')
+            'designStory': design_story
         })
         
     except json.JSONDecodeError as e:
