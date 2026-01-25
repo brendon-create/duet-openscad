@@ -2304,7 +2304,8 @@ def get_order(order_id):
     """
     try:
         # 從 Google Sheets 查詢訂單
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+        gc = gspread.service_account_from_dict(creds_dict)
         sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
         
         # 查找訂單
@@ -2375,7 +2376,7 @@ def save_design_concepts():
             }), 400
         
         # 更新訂單記錄
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
         sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
         
         # 找到訂單行
@@ -2416,7 +2417,7 @@ def send_order_confirmation_with_concepts(order_id, concepts):
     """
     try:
         # 獲取訂單詳情
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
         sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
         
         orders = sheet.get_all_records()
