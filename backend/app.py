@@ -29,7 +29,8 @@ from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
-import gspread  # ← 加入這行
+import gspread
+import traceback  # ← 加入這行
 # ai_service.py - DUET AI 諮詢服務
 
 import anthropic
