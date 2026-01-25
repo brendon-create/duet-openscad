@@ -1880,31 +1880,30 @@ def payment_result():
         # 驗證成功，根據付款狀態導向前端
         if data.get('RtnCode') == '1':
             logger.info(f"✅ OrderResultURL 付款成功，準備導向前端")
-            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
             
-            # 使用 Fragment (#) 而非 Query String (?) - Wix 會過濾 query parameters
+            # 使用 URL 參數（GitHub Pages 不會過濾）
             return f'''
                 <html>
                 <head><meta charset="utf-8"></head>
                 <body>
                     <h2>付款成功！正在導向...</h2>
                     <script>
-                        // 使用 # (fragment) 避免 Wix 過濾參數
-                        window.location.href = "{frontend_url}#payment_success=true&order={order_id}";
+                        window.location.href = "{frontend_url}?payment_success=true&order={order_id}";
                     </script>
                 </body>
                 </html>
             '''
         else:
             logger.warning(f"⚠️ OrderResultURL 付款失敗: {data.get('RtnMsg')}")
-            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
             return f'''
                 <html>
                 <head><meta charset="utf-8"></head>
                 <body>
                     <h2>付款失敗</h2>
                     <script>
-                        window.location.href = "{frontend_url}#payment_failed=true&order={order_id}";
+                        window.location.href = "{frontend_url}?payment_failed=true&order={order_id}";
                     </script>
                 </body>
                 </html>
@@ -2039,13 +2038,13 @@ def payment_success():
     console.log('⏰ 將在 3 秒後跳轉...');
     setTimeout(() => {
         console.log('🔄 開始跳轉到 DUET 頁面');
-        window.location.href = 'https://brendonchen.com/duet';
+        window.location.href = 'https://duet.brendonchen.com';
     }, 3000);
     </script>
     </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
-    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://brendonchen.com/duet" style="color:#667eea;">點擊這裡</a></p>
+    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://duet.brendonchen.com" style="color:#667eea;">點擊這裡</a></p>
     </div></body></html>'''
 
 # ==========================================
