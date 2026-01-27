@@ -2161,7 +2161,7 @@ def api_tryon():
             "5. QUALITY: High-end fashion magazine quality. Keep the person's original face and background exactly the same.\n"
         )
 
-        if not model_b64 or not pendant_b64:
+        if not model_b64 or not pendant_b64 or len(model_b64) < 64 or len(pendant_b64) < 64:
             return jsonify({
                 'success': False,
                 'error': '缺少 modelImageB64 或 pendantImageB64'
@@ -2222,6 +2222,7 @@ def api_tryon():
         return jsonify({
             'success': False,
             'error': 'tryon 服務內部錯誤',
+            'details': str(e),
         }), 500
 
 # ==========================================
