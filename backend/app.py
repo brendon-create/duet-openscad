@@ -44,7 +44,14 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 # Gemini API Key - 使用環境變量（佩戴模擬後端代理）
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_IMAGE_MODEL_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
+# 重要：Nano Banana / 圖像輸出模型會更新，預設使用穩定版（避免 preview shutdown）
+# 可在 Render 設定 GEMINI_TRYON_MODEL 來切換，例如：
+# - gemini-2.5-flash-image
+# - gemini-3-pro-image-preview
+GEMINI_TRYON_MODEL = os.getenv("GEMINI_TRYON_MODEL", "gemini-2.5-flash-image")
+
+def _gemini_generate_url(model_name: str) -> str:
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
 
 # Initialize Anthropic client
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -2171,7 +2178,6 @@ def api_tryon():
         model_mime = data.get('modelMimeType') or 'image/png'
         pendant_mime = data.get('pendantMimeType') or 'image/png'
 
-        url = f"{GEMINI_IMAGE_MODEL_URL}?key={GEMINI_API_KEY}"
         payload = {
             "contents": [{
                 "parts": [
@@ -2183,20 +2189,44 @@ def api_tryon():
             "generationConfig": {"responseModalities": ["IMAGE"]}
         }
 
-        resp = requests.post(url, json=payload, timeout=90)
-        if resp.status_code != 200:
+        # 先用設定的模型；若遇到 NOT_FOUND/不支援，回退到穩定模型
+        models_to_try = [GEMINI_TRYON_MODEL]
+        if GEMINI_TRYON_MODEL != "gemini-2.5-flash-image":
+            models_to_try.append("gemini-2.5-flash-image")
+
+        last_err = None
+        last_status = None
+        resp = None
+        result = None
+
+        for model_name in models_to_try:
+            url = f"{_gemini_generate_url(model_name)}?key={GEMINI_API_KEY}"
+            resp = requests.post(url, json=payload, timeout=90)
+            if resp.status_code == 200:
+                result = resp.json()
+                break
+
+            last_status = resp.status_code
             try:
-                err_json = resp.json()
+                last_err = resp.json()
             except Exception:
-                err_json = {"raw": resp.text[:2000]}
-            logger.error(f"❌ tryon 失敗: HTTP {resp.status_code} {err_json}")
+                last_err = {"raw": resp.text[:2000]}
+
+            logger.error(f"❌ tryon 失敗 (model={model_name}): HTTP {resp.status_code} {last_err}")
+
+            # 只在「找不到/不支援」時嘗試下一個模型
+            if resp.status_code != 404:
+                break
+
+        else:
+            result = None
+
+        if not result:
             return jsonify({
                 'success': False,
                 'error': 'Gemini 服務回應失敗',
-                'details': err_json
+                'details': last_err or {'status': last_status}
             }), 502
-
-        result = resp.json()
         parts = (
             result.get('candidates', [{}])[0]
             .get('content', {})
