@@ -41,6 +41,10 @@ import os
 # API Key - 使用環境變量
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+# Gemini API Key - 使用環境變量（佩戴模擬後端代理）
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_IMAGE_MODEL_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
+
 # Initialize Anthropic client
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
@@ -2102,6 +2106,123 @@ def test_custom_fields():
 def health():
     """健康檢查"""
     return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
+
+# ==========================================
+# 佩戴模擬（Gemini Image）後端代理
+# ==========================================
+
+def _strip_data_url(b64_or_data_url):
+    """允許前端傳 dataURL 或純 base64，統一回傳純 base64。"""
+    if not b64_or_data_url:
+        return None
+    s = b64_or_data_url.strip()
+    if s.startswith("data:") and "," in s:
+        return s.split(",", 1)[1]
+    return s
+
+
+@app.route('/api/tryon', methods=['POST'])
+def api_tryon():
+    """
+    Gemini AI 佩戴合成（後端代理）
+
+    Request JSON:
+    {
+      "modelImageB64": "<base64 或 dataURL>",
+      "pendantImageB64": "<base64 或 dataURL>",
+      "prompt": "<optional prompt>",
+      "modelMimeType": "image/png|image/jpeg" (optional),
+      "pendantMimeType": "image/png|image/jpeg" (optional)
+    }
+
+    Response JSON:
+    {
+      "success": true,
+      "mimeType": "image/png",
+      "imageB64": "<base64>"
+    }
+    """
+    try:
+        if not GEMINI_API_KEY:
+            return jsonify({
+                'success': False,
+                'error': 'GEMINI_API_KEY 未設定（請在 Render 環境變量設定）'
+            }), 500
+
+        data = request.get_json(silent=True) or {}
+        model_b64 = _strip_data_url(data.get('modelImageB64'))
+        pendant_b64 = _strip_data_url(data.get('pendantImageB64'))
+        prompt = data.get('prompt') or (
+            "TASK: Professional Jewelry Portrait Synthesis.\n"
+            "1. ANALYZE: Identify the person's neck and collarbone area in the Model Image.\n"
+            "2. SYNTHESIZE: Place the Pendant Image naturally at the center of the collarbone.\n"
+            "3. CHAIN: Generate a photorealistic metallic chain (Silver/Platinum) that wraps around the neck and connects to the pendant's bail.\n"
+            "4. LIGHTING: Ensure the pendant reflects the environment light of the person's photo. Add soft shadows on the skin where the pendant touches.\n"
+            "5. QUALITY: High-end fashion magazine quality. Keep the person's original face and background exactly the same.\n"
+        )
+
+        if not model_b64 or not pendant_b64:
+            return jsonify({
+                'success': False,
+                'error': '缺少 modelImageB64 或 pendantImageB64'
+            }), 400
+
+        model_mime = data.get('modelMimeType') or 'image/png'
+        pendant_mime = data.get('pendantMimeType') or 'image/png'
+
+        url = f"{GEMINI_IMAGE_MODEL_URL}?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inlineData": {"mimeType": model_mime, "data": model_b64}},
+                    {"inlineData": {"mimeType": pendant_mime, "data": pendant_b64}},
+                ]
+            }],
+            "generationConfig": {"responseModalities": ["IMAGE"]}
+        }
+
+        resp = requests.post(url, json=payload, timeout=90)
+        if resp.status_code != 200:
+            try:
+                err_json = resp.json()
+            except Exception:
+                err_json = {"raw": resp.text[:2000]}
+            logger.error(f"❌ tryon 失敗: HTTP {resp.status_code} {err_json}")
+            return jsonify({
+                'success': False,
+                'error': 'Gemini 服務回應失敗',
+                'details': err_json
+            }), 502
+
+        result = resp.json()
+        parts = (
+            result.get('candidates', [{}])[0]
+            .get('content', {})
+            .get('parts', [])
+        )
+        inline = next((p.get('inlineData') for p in parts if isinstance(p, dict) and p.get('inlineData')), None)
+        if not inline or not inline.get('data'):
+            logger.error(f"❌ tryon 無影像回傳: {str(result)[:2000]}")
+            return jsonify({
+                'success': False,
+                'error': 'AI 渲染未回傳影像',
+                'details': result
+            }), 502
+
+        return jsonify({
+            'success': True,
+            'mimeType': inline.get('mimeType') or 'image/png',
+            'imageB64': inline.get('data'),
+        })
+
+    except Exception as e:
+        logger.error(f"❌ tryon 例外: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': 'tryon 服務內部錯誤',
+        }), 500
 
 # ==========================================
 # 初始化（Gunicorn 會執行這裡）
