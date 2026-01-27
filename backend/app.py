@@ -26,6 +26,7 @@ from datetime import datetime
 import json
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+import requests
 import threading
 import time
 import base64
