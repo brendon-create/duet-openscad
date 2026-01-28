@@ -6,14 +6,6 @@ DUET Backend - 完整版（使用 Resend Email）
 import os
 import sys
 import traceback
-print("=" * 60)
-print("🔍 當前目錄:", os.getcwd())
-print("📂 目錄內容:", os.listdir('.'))
-print("✅ ai_service.py 存在:", os.path.exists('ai_service.py'))
-if os.path.exists('ai_service.py'):
-    print("📄 大小:", os.path.getsize('ai_service.py'), "bytes")
-print("=" * 60)
-# ========== DEBUG 結束 ==========
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
