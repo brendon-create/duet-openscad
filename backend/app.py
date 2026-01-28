@@ -169,9 +169,9 @@ def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
             if not GEMINI_API_KEY:
                 raise ValueError("Gemini API key not configured. Check GEMINI_API_KEY.")
             
-            # 使用 Gemini API - gemini-2.5-flash-image-preview
+            # 使用 Gemini API - gemini-2.5-flash-preview-09-2025 (支援對話)
             model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash-image-preview',  # ✅ 正確的模型名稱
+                model_name='gemini-2.5-flash-preview-09-2025',  # ✅ 支援對話功能的模型
                 generation_config={'temperature': 0.7}
             )
             
