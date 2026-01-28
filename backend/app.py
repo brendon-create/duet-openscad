@@ -169,19 +169,11 @@ def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
             if not GEMINI_API_KEY:
                 raise ValueError("Gemini API key not configured. Check GEMINI_API_KEY.")
             
-            # 使用 Gemini API
-            try:
-                model = genai.GenerativeModel(
-                    model_name='gemini-2.0-flash-exp',
-                    generation_config={'temperature': 0.7}
-                )
-            except Exception as model_error:
-                # 如果模型名稱錯誤，回退到穩定版本
-                print(f"⚠️ gemini-2.0-flash-exp failed, trying gemini-1.5-flash: {model_error}")
-                model = genai.GenerativeModel(
-                    model_name='gemini-1.5-flash',
-                    generation_config={'temperature': 0.7}
-                )
+            # 使用 Gemini API - gemini-2.5-flash-image
+            model = genai.GenerativeModel(
+                model_name='gemini-2.5-flash-image',  # ✅ 正確的模型名稱
+                generation_config={'temperature': 0.7}
+            )
             
             # 轉換訊息格式
             gemini_messages = []
@@ -192,22 +184,31 @@ def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
             # 生成回應
             try:
                 if len(gemini_messages) > 1:
-                    # 多輪對話：使用 chat
-                    chat = model.start_chat(history=gemini_messages[:-1])
+                    # 多輪對話：使用 chat，將 system prompt 併入第一條訊息
+                    history = gemini_messages[:-1]
+                    if history and history[0]["role"] == "user":
+                        # 將 system prompt 加入歷史的第一條用戶訊息
+                        history[0] = {
+                            "role": "user",
+                            "parts": [system_prompt + "\n\n" + history[0]["parts"][0]]
+                        }
+                    
+                    chat = model.start_chat(history=history)
                     response = chat.send_message(
                         gemini_messages[-1]["parts"][0],
                         generation_config={'max_output_tokens': max_tokens}
                     )
                 else:
-                    # 單輪對話：直接生成
+                    # 單輪對話：直接生成（包含 system prompt）
                     response = model.generate_content(
-                        [{"role": "user", "parts": [system_prompt + "\n\n" + gemini_messages[0]["parts"][0]]}],
+                        system_prompt + "\n\n" + gemini_messages[0]["parts"][0],
                         generation_config={'max_output_tokens': max_tokens}
                     )
                 
                 result = response.text
             except Exception as gen_error:
                 print(f"❌ Gemini generation error: {gen_error}")
+                raise
                 raise
             
         else:
