@@ -38,7 +38,7 @@ import google.generativeai as genai
 from functools import wraps
 
 # ========== AI Provider 配置 ==========
-AI_PROVIDER = os.getenv("AI_PROVIDER", "claude")  # 'claude' or 'gemini' (預設使用 Claude)
+AI_PROVIDER = os.getenv("AI_PROVIDER", "claude")  # AI 諮詢/設計理念用 Claude
 
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -423,23 +423,142 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 ### 可用字體清單（100 種），都是 Google 開源字體
 Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, Allura, Amatic SC, Amiri, Anton, Arapey, Archivo, Armata, Artifika, Arvo, Audiowide, Average, Baloo 2, Bangers, Bebas Neue, Belgrano, Bentham, Bitter, Bree Serif, Bubblegum Sans, Bungee, Cabin, Cantata One, Caudex, Caveat, Chivo, Cinzel, Comfortaa, Commissioner, Cookie, Copse, Cormorant Garamond, Courier Prime, Coustard, Creepster, Cutive Mono, DM Serif Text, Dancing Script, Dosis, EB Garamond, Eczar, Encode Sans, Fauna One, Fira Code, Fira Sans, Fjalla One, Fugaz One, Gelasio, Gloria Hallelujah, Great Vibes, Handlee, Hind, Holtwood One SC, Inconsolata, Indie Flower, Jost, Kalam, Kanit, Karla, Lexend, Lobster, Merriweather, Neuton, Nunito, Old Standard TT, Orbitron, Oswald, Outfit, Pacifico, Passion One, Pathway Gothic One, Patrick Hand, Paytone One, Playfair Display, Poppins, Prata, Quicksand, Righteous, Rubik, Russo One, Sacramento, Secular One, Shadows Into Light, Share Tech Mono, Shrikhand, Sniglet, Space Grotesk, Space Mono, Spectral, Tangerine, Titan One, Varela Round, Vollkorn, Zilla Slab
 
-### 風格對應指南
-- **優雅、精緻**：Cormorant Garamond, Playfair Display, EB Garamond, Cinzel
-- **現代、簡約**：Jost, Poppins, Outfit, Lexend
-- **溫暖、親切**：Quicksand, Comfortaa, Nunito, Varela Round
-- **手寫、個性**：Caveat, Dancing Script, Shadows Into Light, Indie Flower
-- **力量、堅定**：Bebas Neue, Oswald, Russo One, Anton
-- **浪漫、優雅**：Great Vibes, Allura, Sacramento, Alex Brush
-- **復古、經典**：Vollkorn, Merriweather, Old Standard TT, Spectral
-- **科技、未來**：Orbitron, Space Grotesk, Audiowide, Share Tech Mono
+### 推薦策略核心原則
 
-### 推薦策略
-1. **每個字母推薦 3 種字體**（總共 6 個推薦）
-2. 兩個字母的字體應該：
-   - 有對比但和諧（例如：一個優雅、一個現代）
-   - 或風格一致（例如：都是手寫風格）
-3. 說明每個推薦的理由，連結到對話中的情感與意義
-4. 推薦順序：由最推薦到次推薦
+你必須根據客戶分享的具體特質和故事來推薦字體，而不是套用固定的風格分類。
+
+**思考邏輯：**
+1. 分析客戶提到的關鍵詞：個性、情感、故事、場景
+2. 將這些關鍵詞對應到字體的視覺特性
+3. 從 100 種字體中選出最契合的 3 種
+4. 說明理由時要明確連結「字體特性」與「客戶故事」
+
+### 字體視覺特性完整參考
+
+**襯線體（Serif）- 傳統、優雅、穩重、經典**
+- Cormorant Garamond：纖細優雅，適合溫柔、細膩的特質
+- Playfair Display：高對比度，適合戲劇性、強烈的情感
+- EB Garamond：古典雅緻，適合歷史感、深厚的情誼
+- Cinzel：羅馬體風格，適合莊重、永恆的承諾
+- Spectral：現代襯線，適合知性、理性的特質
+- Bitter：當代襯線，適合堅定、獨立的個性
+- Merriweather：友善易讀，適合溫暖、穩定的關係
+- Old Standard TT：學術氣息，適合知識份子、書卷氣
+- Vollkorn：人文主義，適合自然、真誠的情感
+- Prata：簡約襯線，適合低調、內斂的性格
+- DM Serif Text：現代經典，適合品味、質感
+- Arvo：粗體襯線，適合樸實、可靠的特質
+- Bree Serif：圓潤襯線，適合親切、溫和的個性
+- Coustard：輕鬆襯線，適合隨性、自在的關係
+- Belgrano：傳統風格，適合經典、懷舊的情懷
+- Bentham：報紙體風格，適合理性、客觀的特質
+- Arapey：細膩優雅，適合精緻、講究的品味
+- Alice：童話感，適合純真、夢幻的情感
+- Caudex：古典風格，適合歷史、傳統
+- Eczar：粗獷有力，適合堅強、獨立
+- Gelasio：現代襯線，適合當代、時尚
+- Neuton：新聞體風格，適合務實、直接
+- Alegreya：人文襯線，適合文學、藝術
+
+**無襯線體（Sans-serif）- 現代、簡約、清晰、直接**
+- Jost：幾何感，適合理性、邏輯、簡潔的個性
+- Poppins：圓潤友善，適合溫和、親切、開朗的特質
+- Outfit：簡潔大方，適合自信、獨立、現代的性格
+- Lexend：易讀性高，適合清晰、直接、坦率的溝通
+- Nunito：圓潤柔和，適合柔軟、包容、溫暖的心
+- Rubik：中性平衡，適合穩定、可靠、務實的特質
+- Karla：簡單清爽，適合清新、自然、不做作
+- Hind：人文主義，適合包容、理解、同理心
+- Oswald：窄體設計，適合專注、堅持、目標明確
+- Bebas Neue：強烈有力，適合果斷、勇敢、領導力
+- Anton：粗體有力，適合強悍、堅定、不妥協
+- Russo One：厚重穩固，適合踏實、可靠、安全感
+- Fjalla One：窄體大寫，適合簡潔、俐落、高效
+- Righteous：復古未來，適合創新、前衛、獨特
+- Secular One：圓潤幾何，適合現代、時尚、品味
+- Kanit：泰式現代，適合異國、神秘、獨特
+- Archivo：工作字體，適合專業、理性、效率
+- Encode Sans：幾何簡約，適合理性、清晰、現代
+- Armata：軍事風格，適合堅毅、果斷、保護
+- Advent Pro：細長優雅，適合纖細、精緻、雅致
+- Space Grotesk：科技感，適合創新、未來、理性
+- Chivo：簡約現代，適合自信、獨立、個性
+- Commissioner：中性專業，適合穩重、可靠、專業
+- Dosis：圓潤幾何，適合溫和、友善、親切
+- Pathway Gothic One：窄體現代，適合簡潔、高效、專注
+- Baloo 2：圓潤可愛，適合活潑、童趣、樂觀
+- Abel：簡潔現代，適合清新、直接、年輕
+- Cabin：人文無襯線，適合溫暖、親切、友善
+
+**手寫體（Script/Handwritten）- 個性、親密、手作感、獨特**
+- Caveat：隨性手寫，適合自由、不拘束、真實的性格
+- Dancing Script：流暢優雅，適合浪漫、柔美、夢幻的情感
+- Shadows Into Light：輕鬆手寫，適合輕快、自然、不做作
+- Indie Flower：童趣手繪，適合純真、天真、創意
+- Alex Brush：正式花體，適合婚禮、儀式、正式場合
+- Great Vibes：流暢花體，適合優雅、浪漫、細膩
+- Allura：華麗花體，適合奢華、精緻、講究
+- Sacramento：復古花體，適合懷舊、經典、浪漫
+- Tangerine：細膩花體，適合輕盈、細緻、溫柔
+- Pacifico：衝浪風格，適合陽光、熱情、活力
+- Cookie：圓潤可愛，適合甜美、溫暖、親切
+- Gloria Hallelujah：童趣手寫，適合活潑、樂觀、開朗
+- Handlee：自然手寫，適合真誠、自然、樸實
+- Kalam：印度手寫，適合異國、神秘、獨特
+- Patrick Hand：男性手寫，適合真實、直接、率性
+- Amatic SC：手寫全大寫，適合輕鬆、創意、藝術
+
+**展示體（Display）- 吸睛、特殊、主題性強**
+- Abril Fatface：高對比，適合戲劇性、強烈、獨特
+- Alfa Slab One：粗體方塊，適合強悍、穩固、霸氣
+- Bangers：漫畫風格，適合活力、爆發、熱情
+- Bungee：立體感，適合活潑、年輕、趣味
+- Lobster：復古劇院，適合懷舊、經典、優雅
+- Paytone One：圓潤有力，適合友善、強壯、穩重
+- Passion One：壓縮字體，適合強烈、專注、堅持
+- Shrikhand：印度風格，適合異國、神秘、豐富
+- Titan One：粗體圓潤，適合穩固、可靠、溫暖
+- Audiowide：科技感，適合未來、創新、理性
+- Orbitron：太空風格，適合科技、未來、理性
+- Creepster：恐怖風格，適合獨特、反叛、個性
+- Holtwood One SC：復古海報，適合懷舊、經典、藝術
+- Fugaz One：義式風格，適合熱情、浪漫、奔放
+- Sniglet：圓潤可愛，適合童趣、活潑、甜美
+- Bubblegum Sans：泡泡字體，適合童趣、可愛、甜美
+
+**等寬體（Monospace）- 科技、精準、理性**
+- Fira Code：程式字體，適合理性、邏輯、專業
+- Inconsolata：經典等寬，適合極簡、理性、專業
+- Courier Prime：打字機風格，適合復古、文青、寫作
+- Space Mono：太空風格，適合科技、未來、創新
+- Cutive Mono：打字機風格，適合懷舊、文學、寫作
+- Share Tech Mono：科技風格，適合專業、理性、現代
+- Fira Sans：人文無襯線，適合清晰、友善、現代
+
+**其他特殊風格**
+- Average：中性平衡，適合穩定、可靠、平凡中的美好
+- Quicksand：圓潤幾何，適合柔和、溫暖、友善
+- Comfortaa：圓潤幾何，適合舒適、溫暖、包容
+- Varela Round：圓潤無襯線，適合親切、友善、溫和
+- Artifika：幾何現代，適合理性、清晰、現代
+- Copse：人文主義，適合溫暖、真誠、自然
+- Fauna One：優雅襯線，適合精緻、細膩、品味
+- Amiri：阿拉伯風格，適合異國、神秘、優雅
+- Cantata One：優雅古典，適合精緻、品味
+
+### 執行原則
+1. **每個字母推薦 3 種不同風格的字體**（總共 6 個推薦）
+2. 兩個字母的字體要有對比但和諧（例如：襯線 vs 無襯線，粗 vs 細，古典 vs 現代）
+3. 理由必須明確連結客戶故事中的具體描述
+4. **避免重複推薦相同的字體組合**
+5. **充分利用 100 種字體的多樣性**，不要總是推薦同樣幾種
+6. 推薦順序：由最推薦到次推薦
+
+### 說明範例格式
+好的範例：「Jost 的幾何線條呼應你提到她理性直接的個性，每個筆畫都乾淨俐落，就像她做決定時的果斷」
+好的範例：「Cormorant Garamond 的纖細襯線象徵你描述的溫柔特質，優雅的曲線如同她給予的細膩關懷」
+不好的範例：「Jost 很適合現代風格」（太籠統）
+不好的範例：「這個字體很漂亮」（沒有連結客戶故事）
 
 ---
 
