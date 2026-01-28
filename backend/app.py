@@ -5,6 +5,7 @@ DUET Backend - 完整版（使用 Resend Email）
 # ========== DEBUG 開始 ==========
 import os
 import sys
+import traceback
 print("=" * 60)
 print("🔍 當前目錄:", os.getcwd())
 print("📂 目錄內容:", os.listdir('.'))
@@ -2363,15 +2364,19 @@ start_background_worker()
 # AI 諮詢對話 API（修正版 - 替換到 app.py）
 # ============================================================
 
-@app.route('/api/ai-consultant', methods=['POST'])
+@app.route('/api/ai-consultant', methods=['POST', 'OPTIONS'])
 def chat():
     """
     AI 諮詢對話 API
     """
     try:
-        data = request.json
-        user_message = data.get('message', '')
-        conversation_history = data.get('history', [])
+        # 讓瀏覽器 CORS preflight 能順利通過
+        if request.method == 'OPTIONS':
+            return ("", 204)
+
+        data = request.get_json(silent=True) or {}
+        user_message = data.get('message', '') or ''
+        conversation_history = data.get('history', []) or []
         
         # 構建訊息
         messages = conversation_history + [
