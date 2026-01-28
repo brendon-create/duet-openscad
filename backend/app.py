@@ -169,9 +169,9 @@ def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
             if not GEMINI_API_KEY:
                 raise ValueError("Gemini API key not configured. Check GEMINI_API_KEY.")
             
-            # 使用 Gemini API - gemini-2.5-flash-image
+            # 使用 Gemini API - gemini-2.5-flash-image-preview
             model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash-image',  # ✅ 正確的模型名稱
+                model_name='gemini-2.5-flash-image-preview',  # ✅ 正確的模型名稱
                 generation_config={'temperature': 0.7}
             )
             
@@ -591,7 +591,7 @@ CORS(app)
 # - 這裡回傳：{ success: true, mimeType, imageB64 }
 # ==========================================
 
-GEMINI_TRYON_MODEL = os.getenv("GEMINI_TRYON_MODEL", "gemini-2.5-flash-image")
+GEMINI_TRYON_MODEL = os.getenv("GEMINI_TRYON_MODEL", "gemini-2.5-flash-image-preview")
 
 
 def _strip_data_url(b64_or_data_url: str) -> str:
@@ -660,8 +660,8 @@ def api_tryon():
     try:
         resp = _call(GEMINI_TRYON_MODEL)
         # 若模型不存在，回退到穩定模型
-        if resp.status_code == 404 and GEMINI_TRYON_MODEL != "gemini-2.5-flash-image":
-            resp = _call("gemini-2.5-flash-image")
+        if resp.status_code == 404 and GEMINI_TRYON_MODEL != "gemini-2.5-flash-image-preview":
+            resp = _call("gemini-2.5-flash-image-preview")
 
         if resp.status_code == 429:
             return (
