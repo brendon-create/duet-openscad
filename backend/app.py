@@ -29,6 +29,7 @@ from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
+import requests
 # ai_service.py - DUET AI 諮詢服務
 
 import anthropic
@@ -581,6 +582,139 @@ Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, All
 
 app = Flask(__name__)
 CORS(app)
+
+# ==========================================
+# Wearing Preview (Gemini) 代理端點
+# - 前端會呼叫 POST /api/tryon（會先發 OPTIONS preflight）
+# - 這裡回傳：{ success: true, mimeType, imageB64 }
+# ==========================================
+
+GEMINI_TRYON_MODEL = os.getenv("GEMINI_TRYON_MODEL", "gemini-2.5-flash-image")
+
+
+def _strip_data_url(b64_or_data_url: str) -> str:
+    if not b64_or_data_url:
+        return ""
+    s = b64_or_data_url.strip()
+    if s.startswith("data:"):
+        comma = s.find(",")
+        if comma != -1:
+            return s[comma + 1 :].strip()
+    return s
+
+
+def _gemini_generate_url(model_name: str) -> str:
+    # Gemini REST API（影像輸出）
+    # https://ai.google.dev/gemini-api/docs/image-generation
+    return f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+
+
+@app.route("/api/tryon", methods=["POST", "OPTIONS"])
+def api_tryon():
+    # Preflight：讓瀏覽器 CORS 檢查過（flask-cors 會補 headers）
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+    if not GEMINI_API_KEY:
+        return jsonify(success=False, error="GEMINI_API_KEY 未設定"), 500
+
+    payload = request.get_json(silent=True) or {}
+    model_b64 = _strip_data_url(payload.get("modelImageB64", ""))
+    pendant_b64 = _strip_data_url(payload.get("pendantImageB64", ""))
+    prompt = payload.get("prompt") or ""
+    model_mime = payload.get("modelMimeType") or "image/png"
+    pendant_mime = payload.get("pendantMimeType") or "image/png"
+
+    # 基本防呆：避免打到 Gemini 才爆
+    if not model_b64 or len(model_b64) < 64:
+        return jsonify(success=False, error="缺少 modelImageB64 或長度不足"), 400
+    if not pendant_b64 or len(pendant_b64) < 64:
+        return jsonify(success=False, error="缺少 pendantImageB64 或長度不足"), 400
+    if not prompt:
+        return jsonify(success=False, error="缺少 prompt"), 400
+
+    req_body = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": model_mime, "data": model_b64}},
+                    {"inline_data": {"mime_type": pendant_mime, "data": pendant_b64}},
+                ],
+            }
+        ],
+        "generationConfig": {
+            # 需要要求影像輸出
+            "responseModalities": ["IMAGE", "TEXT"],
+            "temperature": 0.2,
+        },
+    }
+
+    def _call(model_name: str):
+        url = _gemini_generate_url(model_name)
+        return requests.post(url, json=req_body, timeout=120)
+
+    try:
+        resp = _call(GEMINI_TRYON_MODEL)
+        # 若模型不存在，回退到穩定模型
+        if resp.status_code == 404 and GEMINI_TRYON_MODEL != "gemini-2.5-flash-image":
+            resp = _call("gemini-2.5-flash-image")
+
+        if resp.status_code == 429:
+            return (
+                jsonify(
+                    success=False,
+                    error="Gemini 額度/頻率限制 (429)",
+                    details=resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
+                ),
+                429,
+            )
+
+        if resp.status_code != 200:
+            return (
+                jsonify(
+                    success=False,
+                    error="Gemini 服務回應失敗",
+                    details=resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
+                ),
+                502,
+            )
+
+        data = resp.json()
+        # 從 candidates 內找出 inline image
+        candidates = data.get("candidates") or []
+        image_b64 = None
+        image_mime = None
+        for cand in candidates:
+            parts = (((cand.get("content") or {}).get("parts")) or [])
+            for part in parts:
+                inline = part.get("inlineData") or part.get("inline_data")
+                if inline and (inline.get("data") or ""):
+                    image_b64 = inline.get("data")
+                    image_mime = inline.get("mimeType") or inline.get("mime_type") or "image/png"
+                    break
+            if image_b64:
+                break
+
+        if not image_b64:
+            return jsonify(success=False, error="Gemini 未回傳影像", details=data), 502
+
+        return jsonify(success=True, mimeType=image_mime or "image/png", imageB64=image_b64)
+
+    except Exception as e:
+        return jsonify(success=False, error="tryon 服務內部錯誤", details=str(e)), 500
+
+
+@app.get("/api/ai-provider")
+def api_ai_provider():
+    # 只回傳狀態，不回傳任何 key
+    return jsonify(
+        success=True,
+        provider=AI_PROVIDER,
+        geminiConfigured=bool(GEMINI_API_KEY),
+        claudeConfigured=bool(ANTHROPIC_API_KEY),
+    )
 
 logging.basicConfig(
     level=logging.INFO,
