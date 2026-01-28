@@ -33,9 +33,7 @@ import base64
 
 import anthropic
 import google.generativeai as genai
-import json
-import re
-import os
+from functools import wraps
 
 # ========== AI Provider 配置 ==========
 AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")  # 'claude' or 'gemini'
@@ -44,53 +42,186 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")  # 'claude' or 'gemini'
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Initialize clients
-claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
+# Initialize clients (安全初始化)
+claude_client = None
+if ANTHROPIC_API_KEY:
+    try:
+        claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        print("✅ Claude client initialized")
+    except Exception as e:
+        print(f"⚠️ Claude client initialization failed: {e}")
 
-# ========== 統一 AI 調用函數 ==========
-def call_ai(messages, system_prompt, max_tokens=2000):
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        print("✅ Gemini client initialized")
+    except Exception as e:
+        print(f"⚠️ Gemini client initialization failed: {e}")
+
+# ========== 重試機制裝飾器 ==========
+def retry_with_backoff(max_retries=3, base_delay=0.5):
+    """
+    重試裝飾器：處理 API 頻率限制 (429 錯誤)
+    
+    Args:
+        max_retries: 最大重試次數
+        base_delay: 基礎延遲時間（秒）
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    result = func(*args, **kwargs)
+                    # 如果有重試過，記錄重試次數
+                    if attempt > 0:
+                        print(f"✅ Retry succeeded after {attempt} attempts")
+                    return result
+                except Exception as e:
+                    last_exception = e
+                    error_msg = str(e)
+                    
+                    # 檢查是否是頻率限制錯誤
+                    if ('429' in error_msg or 'rate limit' in error_msg.lower()) and attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)  # 指數退避
+                        print(f"⚠️ Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                        continue
+                    
+                    # 其他錯誤或已達最大重試次數
+                    if attempt < max_retries - 1:
+                        print(f"⚠️ Error occurred, retrying... (attempt {attempt + 1}/{max_retries}): {error_msg}")
+                        time.sleep(base_delay)
+                    else:
+                        print(f"❌ Max retries reached, giving up")
+                        raise last_exception
+            
+            raise last_exception
+        return wrapper
+    return decorator
+
+# ========== AI 使用量日誌記錄 ==========
+ai_usage_log = []
+
+def log_ai_usage(provider, function, response_time, retry_count, success=True):
+    """
+    記錄 AI 使用量
+    
+    Args:
+        provider: 'claude' or 'gemini'
+        function: 'chat' or 'design_story'
+        response_time: 回應時間（秒）
+        retry_count: 重試次數
+        success: 是否成功
+    """
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'provider': provider,
+        'function': function,
+        'response_time': round(response_time, 2),
+        'retry_count': retry_count,
+        'success': success
+    }
+    ai_usage_log.append(log_entry)
+    
+    # Console 輸出
+    status = '✅' if success else '❌'
+    print(f"{status} [AI] {provider} | {function} | {response_time:.2f}s | retries: {retry_count}")
+    
+    return log_entry
+
+# ========== 統一 AI 調用函數（帶重試機制）==========
+@retry_with_backoff(max_retries=3, base_delay=0.5)
+def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
     """
     統一的 AI 調用接口，根據 AI_PROVIDER 選擇使用 Claude 或 Gemini
+    自動包含重試機制和使用量記錄
     
     Args:
         messages: 對話歷史 [{"role": "user", "content": "..."}, ...]
         system_prompt: 系統提示詞
         max_tokens: 最大生成 token 數
+        function_name: 功能名稱（用於日誌）
     
     Returns:
         AI 的回應文字
     """
-    if AI_PROVIDER == "claude":
-        # 使用 Claude API
-        response = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages
-        )
-        return response.content[0].text
+    start_time = time.time()
     
-    elif AI_PROVIDER == "gemini":
-        # 使用 Gemini API
-        model = genai.GenerativeModel(
-            model_name='gemini-2.0-flash-exp',
-            system_instruction=system_prompt
-        )
+    try:
+        if AI_PROVIDER == "claude":
+            if not claude_client:
+                raise ValueError("Claude client not initialized. Check ANTHROPIC_API_KEY.")
+            
+            # 使用 Claude API
+            response = claude_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=messages
+            )
+            result = response.content[0].text
+            
+        elif AI_PROVIDER == "gemini":
+            if not GEMINI_API_KEY:
+                raise ValueError("Gemini API key not configured. Check GEMINI_API_KEY.")
+            
+            # 使用 Gemini API
+            try:
+                model = genai.GenerativeModel(
+                    model_name='gemini-2.0-flash-exp',
+                    generation_config={'temperature': 0.7}
+                )
+            except Exception as model_error:
+                # 如果模型名稱錯誤，回退到穩定版本
+                print(f"⚠️ gemini-2.0-flash-exp failed, trying gemini-1.5-flash: {model_error}")
+                model = genai.GenerativeModel(
+                    model_name='gemini-1.5-flash',
+                    generation_config={'temperature': 0.7}
+                )
+            
+            # 轉換訊息格式
+            gemini_messages = []
+            for msg in messages:
+                role = "user" if msg["role"] == "user" else "model"
+                gemini_messages.append({"role": role, "parts": [msg["content"]]})
+            
+            # 生成回應
+            try:
+                if len(gemini_messages) > 1:
+                    # 多輪對話：使用 chat
+                    chat = model.start_chat(history=gemini_messages[:-1])
+                    response = chat.send_message(
+                        gemini_messages[-1]["parts"][0],
+                        generation_config={'max_output_tokens': max_tokens}
+                    )
+                else:
+                    # 單輪對話：直接生成
+                    response = model.generate_content(
+                        [{"role": "user", "parts": [system_prompt + "\n\n" + gemini_messages[0]["parts"][0]]}],
+                        generation_config={'max_output_tokens': max_tokens}
+                    )
+                
+                result = response.text
+            except Exception as gen_error:
+                print(f"❌ Gemini generation error: {gen_error}")
+                raise
+            
+        else:
+            raise ValueError(f"Unknown AI_PROVIDER: {AI_PROVIDER}")
         
-        # 轉換訊息格式
-        gemini_messages = []
-        for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            gemini_messages.append({"role": role, "parts": [msg["content"]]})
+        # 記錄成功
+        response_time = time.time() - start_time
+        log_ai_usage(AI_PROVIDER, function_name, response_time, 0, success=True)
         
-        # 生成回應
-        chat = model.start_chat(history=gemini_messages[:-1] if len(gemini_messages) > 1 else [])
-        response = chat.send_message(gemini_messages[-1]["parts"][0])
-        return response.text
-    
-    else:
-        raise ValueError(f"Unknown AI_PROVIDER: {AI_PROVIDER}")
+        return result
+        
+    except Exception as e:
+        # 記錄失敗
+        response_time = time.time() - start_time
+        log_ai_usage(AI_PROVIDER, function_name, response_time, 0, success=False)
+        raise
 
 # System Prompt (基於問卷分析設計)
 SYSTEM_PROMPT = """# DUET System Prompt
@@ -726,7 +857,7 @@ def update_order_status(order_id, status, payment_data=None):
 # ==========================================
 
 def save_to_google_sheets(order_data):
-    """儲存訂單到 Google Sheets"""
+    """儲存訂單到 Google Sheets（包含 AI 使用記錄）"""
     if not GOOGLE_SHEETS_ENABLED or not SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
         logger.warning("⚠️ Google Sheets 未啟用，跳過")
         return
@@ -755,6 +886,20 @@ def save_to_google_sheets(order_data):
         final_total = order_data.get('total', 0)
         promo_code = order_data.get('promoCode', '')
         
+        # AI 使用記錄（從最近的日誌中提取）
+        ai_provider = ''
+        ai_response_time = ''
+        ai_retry_count = ''
+        
+        if ai_usage_log:
+            # 取最近的 AI 調用記錄
+            recent_logs = [log for log in ai_usage_log if log.get('success', False)]
+            if recent_logs:
+                last_log = recent_logs[-1]
+                ai_provider = last_log.get('provider', '')
+                ai_response_time = last_log.get('response_time', '')
+                ai_retry_count = last_log.get('retry_count', 0)
+        
         row = [
             order_data.get('orderId', ''),                              # A: 訂單編號
             order_data.get('userInfo', {}).get('name', ''),            # B: 客戶姓名
@@ -767,18 +912,22 @@ def save_to_google_sheets(order_data):
             promo_code,                                                 # I: 優惠碼
             final_total,                                                # J: 結帳金額
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
-            order_data.get('status', 'pending')                         # L: 狀態
+            order_data.get('status', 'pending'),                        # L: 狀態
+            order_data.get('aiData', ''),                               # M: AI 對話數據
+            ai_provider,                                                # N: AI Provider
+            ai_response_time,                                           # O: AI Response Time (s)
+            ai_retry_count                                              # P: AI Retry Count
         ]
         
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range='A:L',  # 不指定分頁名稱
+            range='A:P',  # 擴展到 P 欄
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
         
-        logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')}")
+        logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')} (AI: {ai_provider})")
         
         # 清理臨時檔案
         os.unlink(creds_file.name)
@@ -2102,7 +2251,8 @@ def chat():
         ai_response = call_ai(
             messages=messages,
             system_prompt=SYSTEM_PROMPT,
-            max_tokens=2000
+            max_tokens=2000,
+            function_name='chat'
         )
         
         # 判斷是否完成（只有當輸出 JSON 時才算完成）
@@ -2461,7 +2611,8 @@ def generate_design_story():
         ai_response = call_ai(
             messages=messages,
             system_prompt=SYSTEM_PROMPT,
-            max_tokens=1000
+            max_tokens=1000,
+            function_name='design_story'
         )
         
         # 解析 JSON
