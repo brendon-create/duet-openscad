@@ -6,6 +6,14 @@ DUET Backend - 完整版（使用 Resend Email）
 import os
 import sys
 import traceback
+print("=" * 60)
+print("🔍 當前目錄:", os.getcwd())
+print("📂 目錄內容:", os.listdir('.'))
+print("✅ ai_service.py 存在:", os.path.exists('ai_service.py'))
+if os.path.exists('ai_service.py'):
+    print("📄 大小:", os.path.getsize('ai_service.py'), "bytes")
+print("=" * 60)
+# ========== DEBUG 結束 ==========
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
@@ -30,7 +38,7 @@ import google.generativeai as genai
 from functools import wraps
 
 # ========== AI Provider 配置 ==========
-AI_PROVIDER = os.getenv("AI_PROVIDER", "claude")  # AI 諮詢/設計理念用 Claude
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")  # 'claude' or 'gemini'
 
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -307,7 +315,7 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 
 6. **禁止問不相關的問題**
    - ❌ 禁止問「代表色」「主題色」
-   - ❌ 禁止問「星座」「血型」
+   - ❌ 禁止問「星座」「血型」  
    - ❌ 禁止問「穿衣風格」「配戴習慣」
    - ✅ 只問情感、故事、特質、意義
 
@@ -405,19 +413,13 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 **輸出格式：**
 ```json
 {
-  "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。
-
-優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質，簡約的 Jost 代表 Brendon 的支持與陪伴，兩種字體的對比展現了你們關係中的互補與和諧。
-
-每次配戴時，都能想起這份難得的相遇，提醒彼此好好珍惜，不管發生什麼都要在一起。"
+  "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。\n\n優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質，簡約的 Jost 代表 Brendon 的支持與陪伴，兩種字體的對比展現了你們關係中的互補與和諧。\n\n每次配戴時，都能想起這份難得的相遇，提醒彼此好好珍惜，不管發生什麼都要在一起。"
 }
 ```
 
 **注意：**
 - 回應**只包含 JSON**，不要有其他文字
-- `designStory` 欄位使用 `
-
-` 分隔段落
+- `designStory` 欄位使用 `\n\n` 分隔段落
 - 每段 30-50 字，總共約 100-150 字
 
 ---
@@ -427,139 +429,23 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 ### 可用字體清單（100 種），都是 Google 開源字體
 Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, Allura, Amatic SC, Amiri, Anton, Arapey, Archivo, Armata, Artifika, Arvo, Audiowide, Average, Baloo 2, Bangers, Bebas Neue, Belgrano, Bentham, Bitter, Bree Serif, Bubblegum Sans, Bungee, Cabin, Cantata One, Caudex, Caveat, Chivo, Cinzel, Comfortaa, Commissioner, Cookie, Copse, Cormorant Garamond, Courier Prime, Coustard, Creepster, Cutive Mono, DM Serif Text, Dancing Script, Dosis, EB Garamond, Eczar, Encode Sans, Fauna One, Fira Code, Fira Sans, Fjalla One, Fugaz One, Gelasio, Gloria Hallelujah, Great Vibes, Handlee, Hind, Holtwood One SC, Inconsolata, Indie Flower, Jost, Kalam, Kanit, Karla, Lexend, Lobster, Merriweather, Neuton, Nunito, Old Standard TT, Orbitron, Oswald, Outfit, Pacifico, Passion One, Pathway Gothic One, Patrick Hand, Paytone One, Playfair Display, Poppins, Prata, Quicksand, Righteous, Rubik, Russo One, Sacramento, Secular One, Shadows Into Light, Share Tech Mono, Shrikhand, Sniglet, Space Grotesk, Space Mono, Spectral, Tangerine, Titan One, Varela Round, Vollkorn, Zilla Slab
 
-### 字體推薦策略
+### 風格對應指南
+- **優雅、精緻**：Cormorant Garamond, Playfair Display, EB Garamond, Cinzel
+- **現代、簡約**：Jost, Poppins, Outfit, Lexend
+- **溫暖、親切**：Quicksand, Comfortaa, Nunito, Varela Round
+- **手寫、個性**：Caveat, Dancing Script, Shadows Into Light, Indie Flower
+- **力量、堅定**：Bebas Neue, Oswald, Russo One, Anton
+- **浪漫、優雅**：Great Vibes, Allura, Sacramento, Alex Brush
+- **復古、經典**：Vollkorn, Merriweather, Old Standard TT, Spectral
+- **科技、未來**：Orbitron, Space Grotesk, Audiowide, Share Tech Mono
 
-根據客戶分享的具體特質和故事推薦字體，不要套用固定分類。
-
-思考流程：
-1. 分析客戶關鍵詞（個性、情感、故事、場景）
-2. 將關鍵詞對應到字體視覺特性
-3. 從 100 種字體中選最契合的 3 種
-4. 說明理由時明確連結「字體特性」與「客戶故事」
-
-字體視覺特性完整參考：
-
-襯線體 - 傳統、優雅、穩重、經典
-Cormorant Garamond：纖細優雅，溫柔細膩
-Playfair Display：高對比度，戲劇性強烈情感
-EB Garamond：古典雅緻，歷史感深厚情誼
-Cinzel：羅馬體風格，莊重永恆承諾
-Spectral：現代襯線，知性理性
-Bitter：當代襯線，堅定獨立
-Merriweather：友善易讀，溫暖穩定
-Old Standard TT：學術氣息，知識份子書卷氣
-Vollkorn：人文主義，自然真誠
-Prata：簡約襯線，低調內斂
-DM Serif Text：現代經典，品味質感
-Arvo：粗體襯線，樸實可靠
-Bree Serif：圓潤襯線，親切溫和
-Coustard：輕鬆襯線，隨性自在
-Belgrano：傳統風格，經典懷舊
-Bentham：報紙體風格，理性客觀
-Arapey：細膩優雅，精緻講究
-Alice：童話感，純真夢幻
-Caudex：古典風格，歷史傳統
-Eczar：粗獷有力，堅強獨立
-Gelasio：現代襯線，當代時尚
-Neuton：新聞體風格，務實直接
-Alegreya：人文襯線，文學藝術
-Cantata One：優雅古典，精緻品味
-
-無襯線體 - 現代、簡約、清晰、直接
-Jost：幾何感，理性邏輯簡潔
-Poppins：圓潤友善，溫和親切開朗
-Outfit：簡潔大方，自信獨立現代
-Lexend：易讀性高，清晰直接坦率
-Nunito：圓潤柔和，柔軟包容溫暖
-Rubik：中性平衡，穩定可靠務實
-Karla：簡單清爽，清新自然不做作
-Hind：人文主義，包容理解同理心
-Oswald：窄體設計，專注堅持目標明確
-Bebas Neue：強烈有力，果斷勇敢領導力
-Anton：粗體有力，強悍堅定不妥協
-Russo One：厚重穩固，踏實可靠安全感
-Fjalla One：窄體大寫，簡潔俐落高效
-Righteous：復古未來，創新前衛獨特
-Secular One：圓潤幾何，現代時尚品味
-Kanit：泰式現代，異國神秘獨特
-Archivo：工作字體，專業理性效率
-Encode Sans：幾何簡約，理性清晰現代
-Armata：軍事風格，堅毅果斷保護
-Advent Pro：細長優雅，纖細精緻雅致
-Space Grotesk：科技感，創新未來理性
-Chivo：簡約現代，自信獨立個性
-Commissioner：中性專業，穩重可靠專業
-Dosis：圓潤幾何，溫和友善親切
-Pathway Gothic One：窄體現代，簡潔高效專注
-Baloo 2：圓潤可愛，活潑童趣樂觀
-Abel：簡潔現代，清新直接年輕
-Cabin：人文無襯線，溫暖親切友善
-
-手寫體 - 個性、親密、手作感
-Caveat：隨性手寫，自由不拘束真實
-Dancing Script：流暢優雅，浪漫柔美夢幻
-Shadows Into Light：輕鬆手寫，輕快自然不做作
-Indie Flower：童趣手繪，純真天真創意
-Alex Brush：正式花體，婚禮儀式正式場合
-Great Vibes：流暢花體，優雅浪漫細膩
-Allura：華麗花體，奢華精緻講究
-Sacramento：復古花體，懷舊經典浪漫
-Tangerine：細膩花體，輕盈細緻溫柔
-Pacifico：衝浪風格，陽光熱情活力
-Cookie：圓潤可愛，甜美溫暖親切
-Gloria Hallelujah：童趣手寫，活潑樂觀開朗
-Handlee：自然手寫，真誠自然樸實
-Kalam：印度手寫，異國神秘獨特
-Patrick Hand：男性手寫，真實直接率性
-Amatic SC：手寫全大寫，輕鬆創意藝術
-
-展示體 - 吸睛、特殊、主題性強
-Abril Fatface：高對比，戲劇性強烈獨特
-Alfa Slab One：粗體方塊，強悍穩固霸氣
-Bangers：漫畫風格，活力爆發熱情
-Bungee：立體感，活潑年輕趣味
-Lobster：復古劇院，懷舊經典優雅
-Paytone One：圓潤有力，友善強壯穩重
-Passion One：壓縮字體，強烈專注堅持
-Shrikhand：印度風格，異國神秘豐富
-Titan One：粗體圓潤，穩固可靠溫暖
-Audiowide：科技感，未來創新理性
-Orbitron：太空風格，科技未來理性
-Creepster：恐怖風格，獨特反叛個性
-Holtwood One SC：復古海報，懷舊經典藝術
-Fugaz One：義式風格，熱情浪漫奔放
-Sniglet：圓潤可愛，童趣活潑甜美
-Bubblegum Sans：泡泡字體，童趣可愛甜美
-
-等寬體 - 科技、精準、理性
-Fira Code：程式字體，理性邏輯專業
-Inconsolata：經典等寬，極簡理性專業
-Courier Prime：打字機風格，復古文青寫作
-Space Mono：太空風格，科技未來創新
-Cutive Mono：打字機風格，懷舊文學寫作
-Share Tech Mono：科技風格，專業理性現代
-Fira Sans：人文無襯線，清晰友善現代
-
-其他特殊風格
-Average：中性平衡，穩定可靠平凡中的美好
-Quicksand：圓潤幾何，柔和溫暖友善
-Comfortaa：圓潤幾何，舒適溫暖包容
-Varela Round：圓潤無襯線，親切友善溫和
-Artifika：幾何現代，理性清晰現代
-Copse：人文主義，溫暖真誠自然
-Fauna One：優雅襯線，精緻細膩品味
-Amiri：阿拉伯風格，異國神秘優雅
-
-推薦執行原則：
-1. 每個字母推薦 3 種不同風格字體
-2. 兩個字母字體要對比但和諧
-3. 理由必須明確連結客戶故事具體描述
-4. 避免重複推薦相同組合
-5. 充分利用 100 種字體多樣性
-
-說明範例：
-好的：「Jost 的幾何線條呼應你提到她理性直接的個性，每個筆畫都乾淨俐落」
-不好：「Jost 很適合現代風格」（太籠統）
+### 推薦策略
+1. **每個字母推薦 3 種字體**（總共 6 個推薦）
+2. 兩個字母的字體應該：
+   - 有對比但和諧（例如：一個優雅、一個現代）
+   - 或風格一致（例如：都是手寫風格）
+3. 說明每個推薦的理由，連結到對話中的情感與意義
+4. 推薦順序：由最推薦到次推薦
 
 ---
 
@@ -693,27 +579,9 @@ Amiri：阿拉伯風格，異國神秘優雅
 **AI：**
 ```json
 {
-  "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。經歷過感情的挫折，讓他們更懂得珍惜彼此。
-
-簡潔的 Jost 代表 Brendon 直接而堅定的個性，優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質。兩種字體的對比展現了他們關係中的互補與和諧。
-
-每次配戴時，都能想起這份難得的相遇，提醒彼此不管發生什麼都要在一起，好好珍惜這份得來不易的幸福。"
+  "designStory": "這個 DUET 作品交織了 Brendon 和 Rita 的名字，象徵兩個對愛情同樣執著的靈魂相遇。經歷過感情的挫折，讓他們更懂得珍惜彼此。\n\n簡潔的 Jost 代表 Brendon 直接而堅定的個性，優雅的 Cormorant Garamond 呼應 Rita 的溫柔特質。兩種字體的對比展現了他們關係中的互補與和諧。\n\n每次配戴時，都能想起這份難得的相遇，提醒彼此不管發生什麼都要在一起，好好珍惜這份得來不易的幸福。"
 }
-```"""
-    "commonalities": ["對愛情認真"],
-    "letterMeaning": "B 是 Brendon，R 是 Rita",
-    "emotion": "珍惜相遇",
-    "story": "經歷過挫折更懂珍惜",
-    "wearingFeeling": "想到我們會在一起"
-  }
-}
-
-設計理念階段：客戶說明字體選擇原因後，輸出 JSON
-{
-  "designStory": "第一段談情（30-50字）。\n\n第二段談設計（30-50字）。\n\n第三段談祝福（30-50字）。"
-}
-
-使用繁體中文。你是資深設計師，不是填問卷客服。用專業與溫度，讓每次訂製都是美好對話。
+```
 """
 
 # ==========================================
