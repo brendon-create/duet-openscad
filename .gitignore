@@ -1,26 +1,5 @@
-# macOS
-.DS_Store
-**/.DS_Store
-
-# 測試檔案
-AI consultant/
-duet frontend old/
-duet-font-filter/
-frontend/
-*.html
-!backend/*.html
-
-# 文檔
-QUICK_START.md
-TESTING_GUIDE.md
-survey-analysis.md
-gitignore.txt
-
-# 前端測試
-frontend_*.js
-
-# 備份
-安全版備份/
-
-# 圖片（如果不需要版本控制）
-images/
+# 只追蹤 backend 和必要檔案
+/*
+!backend/
+!.gitignore
+!README.md
