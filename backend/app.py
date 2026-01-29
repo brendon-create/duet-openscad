@@ -5,7 +5,6 @@ DUET Backend - 完整版（使用 Resend Email）
 # ========== DEBUG 開始 ==========
 import os
 import sys
-import traceback
 print("=" * 60)
 print("🔍 當前目錄:", os.getcwd())
 print("📂 目錄內容:", os.listdir('.'))
@@ -30,201 +29,20 @@ from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
-import requests
+import gspread
+import traceback  # ← 加入這行
 # ai_service.py - DUET AI 諮詢服務
 
 import anthropic
-import google.generativeai as genai
-from functools import wraps
+import json
+import re
+import os
 
-# ========== AI Provider 配置 ==========
-AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")  # 'claude' or 'gemini'
-
-# API Keys
+# API Key - 使用環境變量
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Initialize clients (安全初始化)
-claude_client = None
-if ANTHROPIC_API_KEY:
-    try:
-        claude_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        print("✅ Claude client initialized")
-    except Exception as e:
-        print(f"⚠️ Claude client initialization failed: {e}")
-
-if GEMINI_API_KEY:
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        print("✅ Gemini client initialized")
-    except Exception as e:
-        print(f"⚠️ Gemini client initialization failed: {e}")
-
-# ========== 重試機制裝飾器 ==========
-def retry_with_backoff(max_retries=3, base_delay=0.5):
-    """
-    重試裝飾器：處理 API 頻率限制 (429 錯誤)
-    
-    Args:
-        max_retries: 最大重試次數
-        base_delay: 基礎延遲時間（秒）
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(max_retries):
-                try:
-                    result = func(*args, **kwargs)
-                    # 如果有重試過，記錄重試次數
-                    if attempt > 0:
-                        print(f"✅ Retry succeeded after {attempt} attempts")
-                    return result
-                except Exception as e:
-                    last_exception = e
-                    error_msg = str(e)
-                    
-                    # 檢查是否是頻率限制錯誤
-                    if ('429' in error_msg or 'rate limit' in error_msg.lower()) and attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)  # 指數退避
-                        print(f"⚠️ Rate limit hit, retrying in {delay}s... (attempt {attempt + 1}/{max_retries})")
-                        time.sleep(delay)
-                        continue
-                    
-                    # 其他錯誤或已達最大重試次數
-                    if attempt < max_retries - 1:
-                        print(f"⚠️ Error occurred, retrying... (attempt {attempt + 1}/{max_retries}): {error_msg}")
-                        time.sleep(base_delay)
-                    else:
-                        print(f"❌ Max retries reached, giving up")
-                        raise last_exception
-            
-            raise last_exception
-        return wrapper
-    return decorator
-
-# ========== AI 使用量日誌記錄 ==========
-ai_usage_log = []
-
-def log_ai_usage(provider, function, response_time, retry_count, success=True):
-    """
-    記錄 AI 使用量
-    
-    Args:
-        provider: 'claude' or 'gemini'
-        function: 'chat' or 'design_story'
-        response_time: 回應時間（秒）
-        retry_count: 重試次數
-        success: 是否成功
-    """
-    log_entry = {
-        'timestamp': datetime.now().isoformat(),
-        'provider': provider,
-        'function': function,
-        'response_time': round(response_time, 2),
-        'retry_count': retry_count,
-        'success': success
-    }
-    ai_usage_log.append(log_entry)
-    
-    # Console 輸出
-    status = '✅' if success else '❌'
-    print(f"{status} [AI] {provider} | {function} | {response_time:.2f}s | retries: {retry_count}")
-    
-    return log_entry
-
-# ========== 統一 AI 調用函數（帶重試機制）==========
-@retry_with_backoff(max_retries=3, base_delay=0.5)
-def call_ai(messages, system_prompt, max_tokens=2000, function_name='unknown'):
-    """
-    統一的 AI 調用接口，根據 AI_PROVIDER 選擇使用 Claude 或 Gemini
-    自動包含重試機制和使用量記錄
-    
-    Args:
-        messages: 對話歷史 [{"role": "user", "content": "..."}, ...]
-        system_prompt: 系統提示詞
-        max_tokens: 最大生成 token 數
-        function_name: 功能名稱（用於日誌）
-    
-    Returns:
-        AI 的回應文字
-    """
-    start_time = time.time()
-    
-    try:
-        if AI_PROVIDER == "claude":
-            if not claude_client:
-                raise ValueError("Claude client not initialized. Check ANTHROPIC_API_KEY.")
-            
-            # 使用 Claude API
-            response = claude_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=max_tokens,
-                system=system_prompt,
-                messages=messages
-            )
-            result = response.content[0].text
-            
-        elif AI_PROVIDER == "gemini":
-            if not GEMINI_API_KEY:
-                raise ValueError("Gemini API key not configured. Check GEMINI_API_KEY.")
-            
-            # 使用 Gemini API - gemini-2.5-flash-preview-09-2025 (支援對話)
-            model = genai.GenerativeModel(
-                model_name='gemini-2.5-flash-preview-09-2025',  # ✅ 支援對話功能的模型
-                generation_config={'temperature': 0.7}
-            )
-            
-            # 轉換訊息格式
-            gemini_messages = []
-            for msg in messages:
-                role = "user" if msg["role"] == "user" else "model"
-                gemini_messages.append({"role": role, "parts": [msg["content"]]})
-            
-            # 生成回應
-            try:
-                if len(gemini_messages) > 1:
-                    # 多輪對話：使用 chat，將 system prompt 併入第一條訊息
-                    history = gemini_messages[:-1]
-                    if history and history[0]["role"] == "user":
-                        # 將 system prompt 加入歷史的第一條用戶訊息
-                        history[0] = {
-                            "role": "user",
-                            "parts": [system_prompt + "\n\n" + history[0]["parts"][0]]
-                        }
-                    
-                    chat = model.start_chat(history=history)
-                    response = chat.send_message(
-                        gemini_messages[-1]["parts"][0],
-                        generation_config={'max_output_tokens': max_tokens}
-                    )
-                else:
-                    # 單輪對話：直接生成（包含 system prompt）
-                    response = model.generate_content(
-                        system_prompt + "\n\n" + gemini_messages[0]["parts"][0],
-                        generation_config={'max_output_tokens': max_tokens}
-                    )
-                
-                result = response.text
-            except Exception as gen_error:
-                print(f"❌ Gemini generation error: {gen_error}")
-                raise
-                raise
-            
-        else:
-            raise ValueError(f"Unknown AI_PROVIDER: {AI_PROVIDER}")
-        
-        # 記錄成功
-        response_time = time.time() - start_time
-        log_ai_usage(AI_PROVIDER, function_name, response_time, 0, success=True)
-        
-        return result
-        
-    except Exception as e:
-        # 記錄失敗
-        response_time = time.time() - start_time
-        log_ai_usage(AI_PROVIDER, function_name, response_time, 0, success=False)
-        raise
+# Initialize Anthropic client
+client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # System Prompt (基於問卷分析設計)
 SYSTEM_PROMPT = """# DUET System Prompt
@@ -312,12 +130,6 @@ DUET 是一款雙字母交織吊墜，象徵兩個生命的交會與連結。每
 5. **問開放式問題**
    - ❌ 「還有嗎？」「是嗎？」（封閉）
    - ✅ 「有沒有什麼時刻特別能代表這一點？」「能多分享一點嗎？」（開放）
-
-6. **禁止問不相關的問題**
-   - ❌ 禁止問「代表色」「主題色」
-   - ❌ 禁止問「星座」「血型」  
-   - ❌ 禁止問「穿衣風格」「配戴習慣」
-   - ✅ 只問情感、故事、特質、意義
 
 ### 對話範例：
 
@@ -590,139 +402,6 @@ Abel, Abril Fatface, Advent Pro, Alegreya, Alex Brush, Alfa Slab One, Alice, All
 
 app = Flask(__name__)
 CORS(app)
-
-# ==========================================
-# Wearing Preview (Gemini) 代理端點
-# - 前端會呼叫 POST /api/tryon（會先發 OPTIONS preflight）
-# - 這裡回傳：{ success: true, mimeType, imageB64 }
-# ==========================================
-
-GEMINI_TRYON_MODEL = os.getenv("GEMINI_TRYON_MODEL", "gemini-2.5-flash-image-preview")
-
-
-def _strip_data_url(b64_or_data_url: str) -> str:
-    if not b64_or_data_url:
-        return ""
-    s = b64_or_data_url.strip()
-    if s.startswith("data:"):
-        comma = s.find(",")
-        if comma != -1:
-            return s[comma + 1 :].strip()
-    return s
-
-
-def _gemini_generate_url(model_name: str) -> str:
-    # Gemini REST API（影像輸出）
-    # https://ai.google.dev/gemini-api/docs/image-generation
-    return f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-
-
-@app.route("/api/tryon", methods=["POST", "OPTIONS"])
-def api_tryon():
-    # Preflight：讓瀏覽器 CORS 檢查過（flask-cors 會補 headers）
-    if request.method == "OPTIONS":
-        return ("", 204)
-
-    if not GEMINI_API_KEY:
-        return jsonify(success=False, error="GEMINI_API_KEY 未設定"), 500
-
-    payload = request.get_json(silent=True) or {}
-    model_b64 = _strip_data_url(payload.get("modelImageB64", ""))
-    pendant_b64 = _strip_data_url(payload.get("pendantImageB64", ""))
-    prompt = payload.get("prompt") or ""
-    model_mime = payload.get("modelMimeType") or "image/png"
-    pendant_mime = payload.get("pendantMimeType") or "image/png"
-
-    # 基本防呆：避免打到 Gemini 才爆
-    if not model_b64 or len(model_b64) < 64:
-        return jsonify(success=False, error="缺少 modelImageB64 或長度不足"), 400
-    if not pendant_b64 or len(pendant_b64) < 64:
-        return jsonify(success=False, error="缺少 pendantImageB64 或長度不足"), 400
-    if not prompt:
-        return jsonify(success=False, error="缺少 prompt"), 400
-
-    req_body = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                    {"inline_data": {"mime_type": model_mime, "data": model_b64}},
-                    {"inline_data": {"mime_type": pendant_mime, "data": pendant_b64}},
-                ],
-            }
-        ],
-        "generationConfig": {
-            # 需要要求影像輸出
-            "responseModalities": ["IMAGE", "TEXT"],
-            "temperature": 0.2,
-        },
-    }
-
-    def _call(model_name: str):
-        url = _gemini_generate_url(model_name)
-        return requests.post(url, json=req_body, timeout=120)
-
-    try:
-        resp = _call(GEMINI_TRYON_MODEL)
-        # 若模型不存在，回退到穩定模型
-        if resp.status_code == 404 and GEMINI_TRYON_MODEL != "gemini-2.5-flash-image-preview":
-            resp = _call("gemini-2.5-flash-image-preview")
-
-        if resp.status_code == 429:
-            return (
-                jsonify(
-                    success=False,
-                    error="Gemini 額度/頻率限制 (429)",
-                    details=resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
-                ),
-                429,
-            )
-
-        if resp.status_code != 200:
-            return (
-                jsonify(
-                    success=False,
-                    error="Gemini 服務回應失敗",
-                    details=resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
-                ),
-                502,
-            )
-
-        data = resp.json()
-        # 從 candidates 內找出 inline image
-        candidates = data.get("candidates") or []
-        image_b64 = None
-        image_mime = None
-        for cand in candidates:
-            parts = (((cand.get("content") or {}).get("parts")) or [])
-            for part in parts:
-                inline = part.get("inlineData") or part.get("inline_data")
-                if inline and (inline.get("data") or ""):
-                    image_b64 = inline.get("data")
-                    image_mime = inline.get("mimeType") or inline.get("mime_type") or "image/png"
-                    break
-            if image_b64:
-                break
-
-        if not image_b64:
-            return jsonify(success=False, error="Gemini 未回傳影像", details=data), 502
-
-        return jsonify(success=True, mimeType=image_mime or "image/png", imageB64=image_b64)
-
-    except Exception as e:
-        return jsonify(success=False, error="tryon 服務內部錯誤", details=str(e)), 500
-
-
-@app.get("/api/ai-provider")
-def api_ai_provider():
-    # 只回傳狀態，不回傳任何 key
-    return jsonify(
-        success=True,
-        provider=AI_PROVIDER,
-        geminiConfigured=bool(GEMINI_API_KEY),
-        claudeConfigured=bool(ANTHROPIC_API_KEY),
-    )
 
 logging.basicConfig(
     level=logging.INFO,
@@ -999,7 +678,7 @@ def update_order_status(order_id, status, payment_data=None):
 # ==========================================
 
 def save_to_google_sheets(order_data):
-    """儲存訂單到 Google Sheets（包含 AI 使用記錄）"""
+    """儲存訂單到 Google Sheets"""
     if not GOOGLE_SHEETS_ENABLED or not SHEETS_ID or not GOOGLE_CREDENTIALS_JSON:
         logger.warning("⚠️ Google Sheets 未啟用，跳過")
         return
@@ -1028,19 +707,9 @@ def save_to_google_sheets(order_data):
         final_total = order_data.get('total', 0)
         promo_code = order_data.get('promoCode', '')
         
-        # AI 使用記錄（從最近的日誌中提取）
-        ai_provider = ''
-        ai_response_time = ''
-        ai_retry_count = ''
-        
-        if ai_usage_log:
-            # 取最近的 AI 調用記錄
-            recent_logs = [log for log in ai_usage_log if log.get('success', False)]
-            if recent_logs:
-                last_log = recent_logs[-1]
-                ai_provider = last_log.get('provider', '')
-                ai_response_time = last_log.get('response_time', '')
-                ai_retry_count = last_log.get('retry_count', 0)
+        # AI 諮詢資料（轉為 JSON 字串）
+        ai_consultation = order_data.get('aiConsultation')
+        ai_consultation_str = json.dumps(ai_consultation, ensure_ascii=False) if ai_consultation else ''
         
         row = [
             order_data.get('orderId', ''),                              # A: 訂單編號
@@ -1055,21 +724,18 @@ def save_to_google_sheets(order_data):
             final_total,                                                # J: 結帳金額
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
             order_data.get('status', 'pending'),                        # L: 狀態
-            order_data.get('aiData', ''),                               # M: AI 對話數據
-            ai_provider,                                                # N: AI Provider
-            ai_response_time,                                           # O: AI Response Time (s)
-            ai_retry_count                                              # P: AI Retry Count
+            ai_consultation_str                                         # M: AI 諮詢資料（新增）
         ]
         
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range='A:P',  # 擴展到 P 欄
+            range='A:M',  # 擴展到 M 欄
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
         
-        logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')} (AI: {ai_provider})")
+        logger.info(f"📊 已儲存到 Google Sheets: {order_data.get('orderId')}")
         
         # 清理臨時檔案
         os.unlink(creds_file.name)
@@ -2051,6 +1717,7 @@ def checkout():
         items = data['items']
         user_info = data['userInfo']
         promo_code = data.get('promoCode', '')
+        ai_consultation = data.get('aiConsultation', None)  # ✅ 新增：接收 AI 諮詢資料
         return_url = data.get('returnUrl', request.host_url + 'payment-success')
         
         # ✅ 後端驗證優惠碼（安全性必須）
@@ -2077,6 +1744,7 @@ def checkout():
             'promoDescription': promo_info.get('description', '') if promo_info else '',
             'items': items,
             'userInfo': user_info,
+            'aiConsultation': ai_consultation,  # ✅ 新增：儲存 AI 諮詢資料
             'status': 'pending',
             'timestamp': datetime.now().isoformat(),
             'testMode': False
@@ -2088,6 +1756,8 @@ def checkout():
         
         # 取得前端 URL（從環境變數或使用預設值）
         frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        # 取得後端 URL
+        backend_url = request.host_url.rstrip('/')
         
         payment_params = {
             'MerchantID': ECPAY_CONFIG['MerchantID'],
@@ -2097,8 +1767,8 @@ def checkout():
             'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
-            'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'OrderResultURL': f"{frontend_url}?payment_status=success&order_id={order_id}",  # ✅ Client端自動跳轉
+            'ReturnURL': backend_url + '/api/payment/callback',
+            'OrderResultURL': backend_url + f'/api/payment/result?order={order_id}',  # ✅ 指向後端處理
             'ClientBackURL': frontend_url,  # ✅ 手動返回按鈕
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
@@ -2175,6 +1845,86 @@ def payment_callback():
     except Exception as e:
         logger.error(f"❌ 回調處理錯誤: {str(e)}")
         return '0|Error'
+
+@app.route('/api/payment/result', methods=['POST'])
+def payment_result():
+    """處理 OrderResultURL 回調（綠界付款完成後的前端跳轉）"""
+    try:
+        # 接收綠界的 POST 資料
+        data = request.form.to_dict()
+        order_id = request.args.get('order')  # 從 URL 參數取得 order_id
+        
+        logger.info(f"🎯 收到 OrderResultURL 回調: {order_id}")
+        logger.info(f"📦 付款結果資料: RtnCode={data.get('RtnCode')}, RtnMsg={data.get('RtnMsg')}")
+        
+        # 驗證 CheckMacValue
+        received_check_mac = data.pop('CheckMacValue', '')
+        calculated_check_mac = generate_check_mac_value(data, 
+                                                       ECPAY_CONFIG['HashKey'], 
+                                                       ECPAY_CONFIG['HashIV'],
+                                                       is_callback=True)
+        
+        if received_check_mac != calculated_check_mac:
+            logger.error(f"❌ OrderResultURL CheckMacValue 驗證失敗")
+            # 即使驗證失敗，仍然導向前端（讓前端自己查詢訂單狀態）
+            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <script>
+                        window.location.href = "{frontend_url}?order={order_id}&verify_failed=true";
+                    </script>
+                </body>
+                </html>
+            '''
+        
+        # 驗證成功，根據付款狀態導向前端
+        if data.get('RtnCode') == '1':
+            logger.info(f"✅ OrderResultURL 付款成功，準備導向前端")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
+            
+            # 使用 URL 參數（GitHub Pages 不會過濾）
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款成功！正在導向...</h2>
+                    <script>
+                        window.location.href = "{frontend_url}?payment_success=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+        else:
+            logger.warning(f"⚠️ OrderResultURL 付款失敗: {data.get('RtnMsg')}")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款失敗</h2>
+                    <script>
+                        window.location.href = "{frontend_url}?payment_failed=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+            
+    except Exception as e:
+        logger.error(f"❌ OrderResultURL 處理錯誤: {str(e)}")
+        # 錯誤時也導向前端
+        frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        return f'''
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body>
+                <script>
+                    window.location.href = "{frontend_url}?payment_error=true";
+                </script>
+            </body>
+            </html>
+        '''
 
 def process_order_after_payment(order_id, payment_data):
     """付款成功後處理訂單（非同步）"""
@@ -2290,13 +2040,13 @@ def payment_success():
     console.log('⏰ 將在 3 秒後跳轉...');
     setTimeout(() => {
         console.log('🔄 開始跳轉到 DUET 頁面');
-        window.location.href = 'https://brendonchen.com/duet';
+        window.location.href = 'https://duet.brendonchen.com';
     }, 3000);
     </script>
     </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
-    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://brendonchen.com/duet" style="color:#667eea;">點擊這裡</a></p>
+    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://duet.brendonchen.com" style="color:#667eea;">點擊這裡</a></p>
     </div></body></html>'''
 
 # ==========================================
@@ -2371,19 +2121,15 @@ start_background_worker()
 # AI 諮詢對話 API（修正版 - 替換到 app.py）
 # ============================================================
 
-@app.route('/api/ai-consultant', methods=['POST', 'OPTIONS'])
+@app.route('/api/ai-consultant', methods=['POST'])
 def chat():
     """
     AI 諮詢對話 API
     """
     try:
-        # 讓瀏覽器 CORS preflight 能順利通過
-        if request.method == 'OPTIONS':
-            return ("", 204)
-
-        data = request.get_json(silent=True) or {}
-        user_message = data.get('message', '') or ''
-        conversation_history = data.get('history', []) or []
+        data = request.json
+        user_message = data.get('message', '')
+        conversation_history = data.get('history', [])
         
         # 構建訊息
         messages = conversation_history + [
@@ -2393,13 +2139,15 @@ def chat():
             }
         ]
         
-        # 呼叫 AI API
-        ai_response = call_ai(
-            messages=messages,
-            system_prompt=SYSTEM_PROMPT,
+        # 呼叫 Claude API
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
-            function_name='chat'
+            system=SYSTEM_PROMPT,
+            messages=messages
         )
+        
+        ai_response = response.content[0].text
         
         # 判斷是否完成（只有當輸出 JSON 時才算完成）
         is_json_response = False
@@ -2523,6 +2271,32 @@ def api_generate_design_concept():
         }), 500
 
 
+@app.route('/api/order/status/<order_id>', methods=['GET'])
+def get_order_status(order_id):
+    """
+    快速查詢訂單付款狀態（用於前端付款檢測）
+    """
+    try:
+        order = load_order(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'error': '訂單不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'status': order.get('status', 'unknown'),
+            'paid': order.get('status') == 'paid'
+        })
+    except Exception as e:
+        logger.error(f"❌ 查詢訂單狀態錯誤: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/order/<order_id>', methods=['GET'])
 def get_order(order_id):
     """
@@ -2531,8 +2305,9 @@ def get_order(order_id):
     """
     try:
         # 從 Google Sheets 查詢訂單
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+        gc = gspread.service_account_from_dict(creds_dict)
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         # 查找訂單
         orders = sheet.get_all_records()
@@ -2549,11 +2324,19 @@ def get_order(order_id):
                 'error': '訂單不存在'
             }), 404
         
-        # 解析訂單項目（假設存儲為 JSON）
-        items = json.loads(order.get('items', '[]'))
+        # 解析訂單項目（從多個欄位合併）
+        items = []
+        # Google Sheets 的商品存在 E, F, G 欄（商品1, 商品2, 商品3）
+        for i in range(1, 4):  # 最多 3 個商品
+            item_str = order.get(f'商品{i}', '')
+            if item_str:
+                try:
+                    items.append(json.loads(item_str))
+                except:
+                    pass
         
-        # 獲取 AI 諮詢數據（如果有）
-        ai_data_str = order.get('ai_consultation', '')
+        # 獲取 AI 諮詢數據（M 欄）
+        ai_data_str = order.get('AI諮詢資料', '')  # 使用中文欄位名
         ai_data = json.loads(ai_data_str) if ai_data_str else None
         
         return jsonify({
@@ -2594,8 +2377,8 @@ def save_design_concepts():
             }), 400
         
         # 更新訂單記錄
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         # 找到訂單行
         cell = sheet.find(order_id)
@@ -2635,8 +2418,8 @@ def send_order_confirmation_with_concepts(order_id, concepts):
     """
     try:
         # 獲取訂單詳情
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         orders = sheet.get_all_records()
         order = None
@@ -2733,49 +2516,88 @@ def generate_design_story():
         selected_fonts = data.get('selectedFonts', {})
         font_reason = data.get('fontReason', '')
         
-        # 構建訊息（使用第六階段 System Prompt）
+        # DEBUG: 檢查接收到的資料
+        logger.info(f"🔍 設計理念生成請求:")
+        logger.info(f"  - conversationSummary 類型: {type(conversation_summary)}")
+        logger.info(f"  - conversationSummary 內容: {json.dumps(conversation_summary, ensure_ascii=False)[:200]}")
+        logger.info(f"  - fontReason: {font_reason[:100]}")
+        
+        # 提取關鍵資訊
+        conversation_history = conversation_summary.get('conversationHistory', [])
+        ai_summary = conversation_summary.get('summary', '')
+        full_recommendations = conversation_summary.get('fullRecommendations', {})
+        
+        # 將對話歷史轉換為易讀格式
+        conversation_text = ""
+        for msg in conversation_history:
+            role = "AI 顧問" if msg.get('role') == 'assistant' else "顧客"
+            content = msg.get('content', '')
+            conversation_text += f"{role}：{content}\n\n"
+        
+        # 獲取字體推薦理由
+        letter1_recommendations = full_recommendations.get('letter1', [])
+        letter2_recommendations = full_recommendations.get('letter2', [])
+        
+        # 找出用戶選擇的字體及其推薦理由
+        selected_font1_reason = ""
+        selected_font2_reason = ""
+        
+        for rec in letter1_recommendations:
+            if rec.get('font') == selected_fonts.get('font1'):
+                selected_font1_reason = rec.get('reason', '')
+                break
+        
+        for rec in letter2_recommendations:
+            if rec.get('font') == selected_fonts.get('font2'):
+                selected_font2_reason = rec.get('reason', '')
+                break
+        
+        # 構建清晰的提示詞
         messages = [
             {
                 "role": "user",
-                "content": f"""根據以下資訊生成設計理念：
+                "content": f"""請根據以下資訊，生成溫暖、有故事感的設計理念（2-3段，每段30-50字）：
 
-【之前的對話摘要】
-{json.dumps(conversation_summary, ensure_ascii=False, indent=2)}
+=== 完整的諮詢對話 ===
+{conversation_text}
 
-【最終選擇的字體】
-字母 "{selected_fonts.get('letter1', '')}": {selected_fonts.get('font1', '')}
-字母 "{selected_fonts.get('letter2', '')}": {selected_fonts.get('font2', '')}
+=== AI 顧問的總結 ===
+{ai_summary}
 
-【用戶說明】
+=== 選擇的字母與字體 ===
+• 字母 {selected_fonts.get('letter1', '')}: {selected_fonts.get('font1', '')}
+  推薦理由：{selected_font1_reason}
+
+• 字母 {selected_fonts.get('letter2', '')}: {selected_fonts.get('font2', '')}
+  推薦理由：{selected_font2_reason}
+
+=== 顧客對字體選擇的說明 ===
 {font_reason}
 
-請生成設計理念。"""
+=== 任務 ===
+請整合上述所有內容，特別是：
+1. 對話中提到的故事、回憶、轉折點
+2. 兩人的關係特質與共通點
+3. 字體選擇的情感意義
+4. 配戴時想傳達的情感
+
+生成能打動人心的設計理念（2-3段）。直接輸出文字，不要包含任何格式標記。"""
             }
         ]
         
-        # 呼叫 AI API
-        ai_response = call_ai(
-            messages=messages,
-            system_prompt=SYSTEM_PROMPT,
+        # 呼叫 Claude API
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
             max_tokens=1000,
-            function_name='design_story'
+            system=SYSTEM_PROMPT,  # 會使用第六階段邏輯
+            messages=messages
         )
         
-        # 解析 JSON
-        json_str = ai_response.strip()
-        if json_str.startswith('```json'):
-            json_str = json_str[7:]
-        if json_str.startswith('```'):
-            json_str = json_str[3:]
-        if json_str.endswith('```'):
-            json_str = json_str[:-3]
-        json_str = json_str.strip()
-        
-        result = json.loads(json_str)
+        design_story = response.content[0].text.strip()
         
         return jsonify({
             'success': True,
-            'designStory': result.get('designStory', '')
+            'designStory': design_story
         })
         
     except json.JSONDecodeError as e:
