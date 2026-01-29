@@ -1,5 +1,50 @@
-# 只追蹤 backend 和必要檔案
-/*
-!backend/
-!.gitignore
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# 忽略所有根目錄的測試檔案
+/*.html
+/*.json
+/*.py
+/*.md
+/*.txt
+/*.zip
+/*.js
+
+# 只追蹤這些
 !README.md
+!.gitignore
+
+# 忽略測試目錄
+/AI consultant/
+/duet frontend old/
+/duet-font-filter/
+/frontend/
+/images/
+/survey/
+/安全版備份/
+
+# Backend 裡的備份也不要
+backend/backend backup/
+backend/backend 穩定版備份/
+backend/orders/
+backend/stl_files/
+backend/*.old
+backend/app*.py
+backend/ai_service.py
+backend/*.md
+backend/*.zip
+backend/*.json
