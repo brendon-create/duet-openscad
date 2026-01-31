@@ -1,60 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# ========================================
-# 修正工作目錄（必須在所有 import 之前）
-# ========================================
-import os
-import sys
-
-# 獲取腳本所在目錄
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 切換到腳本所在目錄
-os.chdir(script_dir)
-
-# 將目錄加入 Python path
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-
-# Debug 輸出（部署後可以在 Logs 看到）
-print("=" * 60)
-print("🔍 腳本位置:", __file__)
-print("🔍 工作目錄:", os.getcwd())
-print("🔍 目錄內容:", sorted(os.listdir(".")))
-
-for folder in ["models", "prompts"]:
-    if os.path.exists(folder):
-        print(f"✅ {folder}/ 存在，內容:", os.listdir(folder))
-    else:
-        print(f"❌ {folder}/ 不存在")
-
-print("=" * 60)
-# ========================================
-
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-
-# ... 其他 imports
 """
 DUET Backend - 完整版（使用 Resend Email）
 包含：STL 生成、綠界金流、Resend Email、隊列系統
 """
-# ========== DEBUG 開始 ==========
-import os
-import sys
 
-print("=" * 60)
-print("🔍 當前目錄:", os.getcwd())
-print("📂 目錄內容:", os.listdir("."))
-print("✅ ai_service.py 存在:", os.path.exists("ai_service.py"))
-if os.path.exists("ai_service.py"):
-    print("📄 大小:", os.path.getsize("ai_service.py"), "bytes")
-print("=" * 60)
-# ========== DEBUG 結束 ==========
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-
 import subprocess
 import tempfile
 from scad_generator import generate_scad_script
@@ -70,14 +23,11 @@ import time
 import base64
 import gspread
 from models.prompt_manager import PromptManager
-import traceback  # ← 加入這行
-
-# ai_service.py - DUET AI 諮詢服務
-
+import traceback
 import anthropic
-import json
 import re
 import os
+import sys
 
 # API Key - 使用環境變量
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -85,15 +35,23 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # Initialize Anthropic client
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# System Prompt Manager - 動態載入外部 Prompt
+# ========== System Prompt 管理 ==========
 prompt_manager = PromptManager("prompts/system_prompt.md")
-SYSTEM_PROMPT = prompt_manager.load_prompt()
 
-# 如果外部 Prompt 載入失敗，使用 fallback（不應該發生）
-if not SYSTEM_PROMPT:
-    print("❌ 致命錯誤：無法載入 System Prompt")
-    # 這裡可以加上緊急 fallback 或停止服務
-    raise Exception("System Prompt 載入失敗，請檢查 prompts/system_prompt.md 是否存在")
+try:
+    SYSTEM_PROMPT = prompt_manager.load_prompt()
+    print("=" * 60)
+    print("✅ System Prompt 已載入（外部檔案）")
+    print("   來源: prompts/system_prompt.md")
+    print("   大小:", len(SYSTEM_PROMPT), "字元")
+    print("=" * 60)
+except Exception as e:
+    print("=" * 60)
+    print(f"❌ System Prompt 載入失敗: {e}")
+    print("⚠️  服務無法啟動")
+    print("=" * 60)
+    raise Exception("System Prompt 載入失敗，請檢查 prompts/system_prompt.md")
+
 
 
 # ==========================================
