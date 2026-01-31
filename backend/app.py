@@ -1507,18 +1507,22 @@ def checkout():
             "MerchantTradeDate": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
             "PaymentType": "aio",
             "TotalAmount": str(int(round(final_total))),  # ✅ 四捨五入後轉整數
-            "TradeDesc": "DUET",
-            "ItemName": "Pendant",
+            "TradeDesc": "DUET Jewelry",
+            "ItemName": "DUET Custom Pendant",
             "ReturnURL": backend_url + "/api/payment/callback",
             "OrderResultURL": backend_url
             + f"/api/payment/result?order={order_id}",  # ✅ 指向後端處理
             "ClientBackURL": frontend_url,  # ✅ 手動返回按鈕
-            "ChoosePayment": "Credit",
+            "ChoosePayment": "Credit",  # ✅ 只使用信用卡
             "EncryptType": "1",
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
         }
         
-        logger.info(f"💳 綠界參數: TotalAmount={payment_params['TotalAmount']}, MerchantTradeNo={order_id}")
+        logger.info(f"💳 綠界參數:")
+        logger.info(f"   - TotalAmount: {payment_params['TotalAmount']}")
+        logger.info(f"   - MerchantTradeNo: {order_id}")
+        logger.info(f"   - ChoosePayment: {payment_params['ChoosePayment']}")
+        logger.info(f"   - PaymentURL: {ECPAY_CONFIG['PaymentURL']}")
 
         check_mac_value = generate_check_mac_value(
             payment_params, ECPAY_CONFIG["HashKey"], ECPAY_CONFIG["HashIV"]
