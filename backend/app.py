@@ -53,6 +53,7 @@ except Exception as e:
     raise Exception("System Prompt 載入失敗，請檢查 prompts/system_prompt.md")
 
 
+
 # ==========================================
 # Flask 應用初始化
 # ==========================================
@@ -382,7 +383,7 @@ def save_to_google_sheets(order_data):
         ai_consultation_str = (
             json.dumps(ai_consultation, ensure_ascii=False) if ai_consultation else ""
         )
-
+        
         # 提取設計理念（從第一個商品）
         design_story = ""
         if len(items) > 0 and isinstance(items[0], dict):
