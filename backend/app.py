@@ -1452,10 +1452,28 @@ def checkout():
             return jsonify({"success": False, "error": error_msg or "優惠碼無效"}), 400
 
         # 計算最終金額
+        # 確保數值型態正確
+        try:
+            original_total = float(original_total)
+            discount = float(discount)
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ 金額格式錯誤: original_total={original_total}, discount={discount}")
+            return jsonify({"success": False, "error": "金額格式錯誤"}), 400
+        
         final_total = original_total - discount
+        
+        # 四捨五入到整數
+        final_total = round(final_total)
+        
+        # 特殊狀況：金額 ≤ 0 時設為 1 元
+        special_amount_case = False
+        if final_total <= 0:
+            logger.warning(f"⚠️ 特殊狀況：優惠後金額為 NT${final_total}，將設定為 NT$1（需用戶確認）")
+            final_total = 1
+            special_amount_case = True
 
         logger.info(
-            f"💰 原始金額: NT$ {original_total}, 折扣: NT$ {discount}, 最終金額: NT$ {final_total}"
+            f"💰 原始金額: NT$ {original_total}, 折扣: NT$ {discount}, 最終金額: NT$ {final_total}, 特殊狀況: {special_amount_case}"
         )
 
         order_data = {
@@ -1463,6 +1481,7 @@ def checkout():
             "originalTotal": original_total,  # 記錄原始金額
             "discount": discount,  # 記錄折扣金額
             "total": final_total,  # 最終付款金額
+            "specialAmountCase": special_amount_case,  # ✅ 標記特殊狀況
             "promoCode": promo_code if is_valid else "",  # 記錄使用的優惠碼
             "promoDescription": promo_info.get("description", "") if promo_info else "",
             "items": items,
@@ -1487,7 +1506,7 @@ def checkout():
             "MerchantTradeNo": order_id,
             "MerchantTradeDate": datetime.now().strftime("%Y/%m/%d %H:%M:%S"),
             "PaymentType": "aio",
-            "TotalAmount": str(int(final_total)),  # ✅ 使用折扣後的金額
+            "TotalAmount": str(int(round(final_total))),  # ✅ 四捨五入後轉整數
             "TradeDesc": "DUET",
             "ItemName": "Pendant",
             "ReturnURL": backend_url + "/api/payment/callback",
@@ -1498,6 +1517,8 @@ def checkout():
             "EncryptType": "1",
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
         }
+        
+        logger.info(f"💳 綠界參數: TotalAmount={payment_params['TotalAmount']}, MerchantTradeNo={order_id}")
 
         check_mac_value = generate_check_mac_value(
             payment_params, ECPAY_CONFIG["HashKey"], ECPAY_CONFIG["HashIV"]
@@ -1521,6 +1542,8 @@ def checkout():
                 "orderId": order_id,
                 "finalTotal": final_total,  # 返回最終金額給前端確認
                 "discount": discount,
+                "specialAmountCase": special_amount_case,  # ✅ 告知前端需顯示說明
+                "originalTotal": original_total,  # 返回原始金額
             }
         )
     except Exception as e:
