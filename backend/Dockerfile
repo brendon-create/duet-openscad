@@ -150,4 +150,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 
 # Render 會提供 PORT 環境變量
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 300 app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 300 app:app"]# Deploy: Sat Jan 31 22:12:45 CST 2026
