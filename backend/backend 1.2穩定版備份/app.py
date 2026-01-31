@@ -29,6 +29,8 @@ from sib_api_v3_sdk.rest import ApiException
 import threading
 import time
 import base64
+import gspread
+import traceback  # ← 加入這行
 # ai_service.py - DUET AI 諮詢服務
 
 import anthropic
@@ -705,6 +707,10 @@ def save_to_google_sheets(order_data):
         final_total = order_data.get('total', 0)
         promo_code = order_data.get('promoCode', '')
         
+        # AI 諮詢資料（轉為 JSON 字串）
+        ai_consultation = order_data.get('aiConsultation')
+        ai_consultation_str = json.dumps(ai_consultation, ensure_ascii=False) if ai_consultation else ''
+        
         row = [
             order_data.get('orderId', ''),                              # A: 訂單編號
             order_data.get('userInfo', {}).get('name', ''),            # B: 客戶姓名
@@ -717,13 +723,14 @@ def save_to_google_sheets(order_data):
             promo_code,                                                 # I: 優惠碼
             final_total,                                                # J: 結帳金額
             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),              # K: 建立時間
-            order_data.get('status', 'pending')                         # L: 狀態
+            order_data.get('status', 'pending'),                        # L: 狀態
+            ai_consultation_str                                         # M: AI 諮詢資料（新增）
         ]
         
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range='A:L',  # 不指定分頁名稱
+            range='A:M',  # 擴展到 M 欄
             valueInputOption='RAW',
             body={'values': [row]}
         ).execute()
@@ -1710,6 +1717,7 @@ def checkout():
         items = data['items']
         user_info = data['userInfo']
         promo_code = data.get('promoCode', '')
+        ai_consultation = data.get('aiConsultation', None)  # ✅ 新增：接收 AI 諮詢資料
         return_url = data.get('returnUrl', request.host_url + 'payment-success')
         
         # ✅ 後端驗證優惠碼（安全性必須）
@@ -1736,6 +1744,7 @@ def checkout():
             'promoDescription': promo_info.get('description', '') if promo_info else '',
             'items': items,
             'userInfo': user_info,
+            'aiConsultation': ai_consultation,  # ✅ 新增：儲存 AI 諮詢資料
             'status': 'pending',
             'timestamp': datetime.now().isoformat(),
             'testMode': False
@@ -1745,6 +1754,11 @@ def checkout():
         # 準備 CustomField（訂單備份）
         custom_fields = prepare_custom_fields(order_data)
         
+        # 取得前端 URL（從環境變數或使用預設值）
+        frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        # 取得後端 URL
+        backend_url = request.host_url.rstrip('/')
+        
         payment_params = {
             'MerchantID': ECPAY_CONFIG['MerchantID'],
             'MerchantTradeNo': order_id,
@@ -1753,8 +1767,9 @@ def checkout():
             'TotalAmount': str(int(final_total)),  # ✅ 使用折扣後的金額
             'TradeDesc': 'DUET',
             'ItemName': 'Pendant',
-            'ReturnURL': request.host_url.rstrip('/') + '/api/payment/callback',
-            'ClientBackURL': request.host_url.rstrip('/') + '/payment-success',  # ✅ 付款完成後跳轉
+            'ReturnURL': backend_url + '/api/payment/callback',
+            'OrderResultURL': backend_url + f'/api/payment/result?order={order_id}',  # ✅ 指向後端處理
+            'ClientBackURL': frontend_url,  # ✅ 手動返回按鈕
             'ChoosePayment': 'Credit',
             'EncryptType': '1',
             # **custom_fields  # 暂时注释，等验证逻辑修正后再启用
@@ -1830,6 +1845,86 @@ def payment_callback():
     except Exception as e:
         logger.error(f"❌ 回調處理錯誤: {str(e)}")
         return '0|Error'
+
+@app.route('/api/payment/result', methods=['POST'])
+def payment_result():
+    """處理 OrderResultURL 回調（綠界付款完成後的前端跳轉）"""
+    try:
+        # 接收綠界的 POST 資料
+        data = request.form.to_dict()
+        order_id = request.args.get('order')  # 從 URL 參數取得 order_id
+        
+        logger.info(f"🎯 收到 OrderResultURL 回調: {order_id}")
+        logger.info(f"📦 付款結果資料: RtnCode={data.get('RtnCode')}, RtnMsg={data.get('RtnMsg')}")
+        
+        # 驗證 CheckMacValue
+        received_check_mac = data.pop('CheckMacValue', '')
+        calculated_check_mac = generate_check_mac_value(data, 
+                                                       ECPAY_CONFIG['HashKey'], 
+                                                       ECPAY_CONFIG['HashIV'],
+                                                       is_callback=True)
+        
+        if received_check_mac != calculated_check_mac:
+            logger.error(f"❌ OrderResultURL CheckMacValue 驗證失敗")
+            # 即使驗證失敗，仍然導向前端（讓前端自己查詢訂單狀態）
+            frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <script>
+                        window.location.href = "{frontend_url}?order={order_id}&verify_failed=true";
+                    </script>
+                </body>
+                </html>
+            '''
+        
+        # 驗證成功，根據付款狀態導向前端
+        if data.get('RtnCode') == '1':
+            logger.info(f"✅ OrderResultURL 付款成功，準備導向前端")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
+            
+            # 使用 URL 參數（GitHub Pages 不會過濾）
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款成功！正在導向...</h2>
+                    <script>
+                        window.location.href = "{frontend_url}?payment_success=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+        else:
+            logger.warning(f"⚠️ OrderResultURL 付款失敗: {data.get('RtnMsg')}")
+            frontend_url = os.getenv('FRONTEND_URL', 'https://duet.brendonchen.com')
+            return f'''
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body>
+                    <h2>付款失敗</h2>
+                    <script>
+                        window.location.href = "{frontend_url}?payment_failed=true&order={order_id}";
+                    </script>
+                </body>
+                </html>
+            '''
+            
+    except Exception as e:
+        logger.error(f"❌ OrderResultURL 處理錯誤: {str(e)}")
+        # 錯誤時也導向前端
+        frontend_url = os.getenv('FRONTEND_URL', 'https://www.brendonchen.com/duet')
+        return f'''
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body>
+                <script>
+                    window.location.href = "{frontend_url}?payment_error=true";
+                </script>
+            </body>
+            </html>
+        '''
 
 def process_order_after_payment(order_id, payment_data):
     """付款成功後處理訂單（非同步）"""
@@ -1945,13 +2040,13 @@ def payment_success():
     console.log('⏰ 將在 3 秒後跳轉...');
     setTimeout(() => {
         console.log('🔄 開始跳轉到 DUET 頁面');
-        window.location.href = 'https://brendonchen.com/duet';
+        window.location.href = 'https://duet.brendonchen.com';
     }, 3000);
     </script>
     </head>
     <body><div class="container"><div class="success-icon">✅</div><h1>支付成功！</h1>
     <p>感謝您的訂購！</p><p>確認信已發送至您的信箱。</p><p>正在返回設計頁面...</p>
-    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://brendonchen.com/duet" style="color:#667eea;">點擊這裡</a></p>
+    <p style="font-size:12px;color:#999;margin-top:20px;">如果沒有自動跳轉，請<a href="https://duet.brendonchen.com" style="color:#667eea;">點擊這裡</a></p>
     </div></body></html>'''
 
 # ==========================================
@@ -2176,6 +2271,32 @@ def api_generate_design_concept():
         }), 500
 
 
+@app.route('/api/order/status/<order_id>', methods=['GET'])
+def get_order_status(order_id):
+    """
+    快速查詢訂單付款狀態（用於前端付款檢測）
+    """
+    try:
+        order = load_order(order_id)
+        if not order:
+            return jsonify({
+                'success': False,
+                'error': '訂單不存在'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'order_id': order_id,
+            'status': order.get('status', 'unknown'),
+            'paid': order.get('status') == 'paid'
+        })
+    except Exception as e:
+        logger.error(f"❌ 查詢訂單狀態錯誤: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/order/<order_id>', methods=['GET'])
 def get_order(order_id):
     """
@@ -2184,8 +2305,9 @@ def get_order(order_id):
     """
     try:
         # 從 Google Sheets 查詢訂單
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        creds_dict = json.loads(GOOGLE_CREDENTIALS_JSON)
+        gc = gspread.service_account_from_dict(creds_dict)
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         # 查找訂單
         orders = sheet.get_all_records()
@@ -2202,11 +2324,19 @@ def get_order(order_id):
                 'error': '訂單不存在'
             }), 404
         
-        # 解析訂單項目（假設存儲為 JSON）
-        items = json.loads(order.get('items', '[]'))
+        # 解析訂單項目（從多個欄位合併）
+        items = []
+        # Google Sheets 的商品存在 E, F, G 欄（商品1, 商品2, 商品3）
+        for i in range(1, 4):  # 最多 3 個商品
+            item_str = order.get(f'商品{i}', '')
+            if item_str:
+                try:
+                    items.append(json.loads(item_str))
+                except:
+                    pass
         
-        # 獲取 AI 諮詢數據（如果有）
-        ai_data_str = order.get('ai_consultation', '')
+        # 獲取 AI 諮詢數據（M 欄）
+        ai_data_str = order.get('AI諮詢資料', '')  # 使用中文欄位名
         ai_data = json.loads(ai_data_str) if ai_data_str else None
         
         return jsonify({
@@ -2247,8 +2377,8 @@ def save_design_concepts():
             }), 400
         
         # 更新訂單記錄
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         # 找到訂單行
         cell = sheet.find(order_id)
@@ -2288,8 +2418,8 @@ def send_order_confirmation_with_concepts(order_id, concepts):
     """
     try:
         # 獲取訂單詳情
-        gc = gspread.service_account_from_dict(GOOGLE_SHEETS_CREDENTIALS)
-        sheet = gc.open_by_key(SHEETS_CONFIG['orders']['spreadsheet_id']).sheet1
+        gc = gspread.service_account_from_dict(json.loads(GOOGLE_CREDENTIALS_JSON))
+        sheet = gc.open_by_key(SHEETS_ID).sheet1
         
         orders = sheet.get_all_records()
         order = None
@@ -2386,23 +2516,72 @@ def generate_design_story():
         selected_fonts = data.get('selectedFonts', {})
         font_reason = data.get('fontReason', '')
         
-        # 構建訊息（使用第六階段 System Prompt）
+        # DEBUG: 檢查接收到的資料
+        logger.info(f"🔍 設計理念生成請求:")
+        logger.info(f"  - conversationSummary 類型: {type(conversation_summary)}")
+        logger.info(f"  - conversationSummary 內容: {json.dumps(conversation_summary, ensure_ascii=False)[:200]}")
+        logger.info(f"  - fontReason: {font_reason[:100]}")
+        
+        # 提取關鍵資訊
+        conversation_history = conversation_summary.get('conversationHistory', [])
+        ai_summary = conversation_summary.get('summary', '')
+        full_recommendations = conversation_summary.get('fullRecommendations', {})
+        
+        # 將對話歷史轉換為易讀格式
+        conversation_text = ""
+        for msg in conversation_history:
+            role = "AI 顧問" if msg.get('role') == 'assistant' else "顧客"
+            content = msg.get('content', '')
+            conversation_text += f"{role}：{content}\n\n"
+        
+        # 獲取字體推薦理由
+        letter1_recommendations = full_recommendations.get('letter1', [])
+        letter2_recommendations = full_recommendations.get('letter2', [])
+        
+        # 找出用戶選擇的字體及其推薦理由
+        selected_font1_reason = ""
+        selected_font2_reason = ""
+        
+        for rec in letter1_recommendations:
+            if rec.get('font') == selected_fonts.get('font1'):
+                selected_font1_reason = rec.get('reason', '')
+                break
+        
+        for rec in letter2_recommendations:
+            if rec.get('font') == selected_fonts.get('font2'):
+                selected_font2_reason = rec.get('reason', '')
+                break
+        
+        # 構建清晰的提示詞
         messages = [
             {
                 "role": "user",
-                "content": f"""根據以下資訊生成設計理念：
+                "content": f"""請根據以下資訊，生成溫暖、有故事感的設計理念（2-3段，每段30-50字）：
 
-【之前的對話摘要】
-{json.dumps(conversation_summary, ensure_ascii=False, indent=2)}
+=== 完整的諮詢對話 ===
+{conversation_text}
 
-【最終選擇的字體】
-字母 "{selected_fonts.get('letter1', '')}": {selected_fonts.get('font1', '')}
-字母 "{selected_fonts.get('letter2', '')}": {selected_fonts.get('font2', '')}
+=== AI 顧問的總結 ===
+{ai_summary}
 
-【用戶說明】
+=== 選擇的字母與字體 ===
+• 字母 {selected_fonts.get('letter1', '')}: {selected_fonts.get('font1', '')}
+  推薦理由：{selected_font1_reason}
+
+• 字母 {selected_fonts.get('letter2', '')}: {selected_fonts.get('font2', '')}
+  推薦理由：{selected_font2_reason}
+
+=== 顧客對字體選擇的說明 ===
 {font_reason}
 
-請生成設計理念。"""
+=== 任務 ===
+請整合上述所有內容，特別是：
+1. 對話中提到的故事、回憶、轉折點
+2. 兩人的關係特質與共通點
+3. 字體選擇的情感意義
+4. 配戴時想傳達的情感
+
+生成能打動人心的設計理念（2-3段）。直接輸出文字，不要包含任何格式標記。"""
             }
         ]
         
@@ -2414,23 +2593,11 @@ def generate_design_story():
             messages=messages
         )
         
-        ai_response = response.content[0].text
-        
-        # 解析 JSON
-        json_str = ai_response.strip()
-        if json_str.startswith('```json'):
-            json_str = json_str[7:]
-        if json_str.startswith('```'):
-            json_str = json_str[3:]
-        if json_str.endswith('```'):
-            json_str = json_str[:-3]
-        json_str = json_str.strip()
-        
-        result = json.loads(json_str)
+        design_story = response.content[0].text.strip()
         
         return jsonify({
             'success': True,
-            'designStory': result.get('designStory', '')
+            'designStory': design_story
         })
         
     except json.JSONDecodeError as e:
