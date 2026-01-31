@@ -124,15 +124,30 @@ RUN echo "=== Installed fonts count ===" && \
     fc-list : family | sort -u | wc -l && \
     echo "==========================="
 
+# 先複製 requirements.txt 並安裝（利用 Docker cache）
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 複製所有應用程式檔案和資料夾
 COPY app.py .
 COPY scad_generator.py .
+COPY models/ ./models/
+COPY prompts/ ./prompts/
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Debug: 確認檔案結構
+RUN echo "=== 📂 檔案結構確認 ===" && \
+    ls -la && \
+    echo "" && \
+    echo "=== models/ ===" && \
+    ls -la models/ && \
+    echo "" && \
+    echo "=== prompts/ ===" && \
+    ls -la prompts/ && \
+    echo "========================"
 
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 5000
 
-# Render 會提供 PORT 環境變量；用它可避免健康檢查失敗
+# Render 會提供 PORT 環境變量
 CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 300 app:app"]
