@@ -53,7 +53,6 @@ except Exception as e:
     raise Exception("System Prompt 載入失敗，請檢查 prompts/system_prompt.md")
 
 
-
 # ==========================================
 # Flask 應用初始化
 # ==========================================
@@ -384,6 +383,11 @@ def save_to_google_sheets(order_data):
             json.dumps(ai_consultation, ensure_ascii=False) if ai_consultation else ""
         )
 
+        # 提取設計理念（從第一個商品）
+        design_story = ""
+        if len(items) > 0 and isinstance(items[0], dict):
+            design_story = items[0].get("designStory", "")
+
         row = [
             order_data.get("orderId", ""),  # A: 訂單編號
             order_data.get("userInfo", {}).get("name", ""),  # B: 客戶姓名
@@ -397,13 +401,14 @@ def save_to_google_sheets(order_data):
             final_total,  # J: 結帳金額
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # K: 建立時間
             order_data.get("status", "pending"),  # L: 狀態
-            ai_consultation_str,  # M: AI 諮詢資料（新增）
+            ai_consultation_str,  # M: AI 諮詢資料
+            design_story,  # N: 設計理念
         ]
 
         # 寫入 Google Sheets（不指定分頁名稱，使用第一個分頁）
         service.spreadsheets().values().append(
             spreadsheetId=SHEETS_ID,
-            range="A:M",  # 擴展到 M 欄
+            range="A:N",  # 擴展到 N 欄（包含設計理念）
             valueInputOption="RAW",
             body={"values": [row]},
         ).execute()
